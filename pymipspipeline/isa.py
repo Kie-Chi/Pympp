@@ -58,15 +58,10 @@ class Packet:
     stage: Stage = Stage.IF
     
     instr: Type['Instruction']
-    rs: int = 0
-    rt: int = 0
     
     alu: Dict[int, Change] = field(default_factory=dict)
     mem: Dict[int, Change] = field(default_factory=dict)
 
-    stall: bool = False
-    s_reason: str = "" # reason for stall
-    f_reasons: Dict[Stage, str] = field(default_factory=dict) # reason for forward
     optional: Dict[str, Any] = field(default_factory=dict) # extra data for Packet
 
     def __post_init__(self):
@@ -94,6 +89,10 @@ class Instruction(ABC):
 
     @property
     def tnew(self) -> Stage: return self._tnew
+
+    def remaining(self, stage: Stage) -> int:
+        _r = self._tnew - stage
+        return _r if _r > 0 else 0
     
     @property
     def opcode(self) -> int: return (self.raw >> 26) & 0x3F
@@ -125,15 +124,6 @@ class Instruction(ABC):
     def imm26(self) -> int: return self.raw & 0x3FFFFFF
 
     @abstractmethod
-    def get_wd(self) -> int:
-        """
-        Get the destination register of the instruction
-        0 -> Not Write
-        1 ~ 31 -> Write to GPR[get_wd()]
-        """
-        pass
-
-    @abstractmethod
     def get_wreg(self) -> Optional[int]: pass
 
     @abstractmethod
@@ -156,10 +146,10 @@ class Add(Instruction):
     def execute(self, packet: Packet):
         if packet.stage != Stage.EX:
             return
-        rs_val = packet.pool.request(self.rs, Stage.EX, packet)
-        rt_val = packet.pool.request(self.rt, Stage.EX, packet)
+        rs_val = packet.pool.request(self.rs, packet.stage)
+        rt_val = packet.pool.request(self.rt, packet.stage)
         result = rs_val + rt_val
-        packet.alu[self.rd] = Change(origin=packet.pool.request(self.rd, Stage.EX, packet), new=result, reason="add")
+        packet.alu[self.rd] = Change(origin=packet.pool.request(self.rd, packet.stage), new=result, reason="add")
 
 # 示例：Lw 指令
 @instr(opcode=0b100011, tuse_rs=Stage.EX, tnew=Stage.WB)
@@ -172,13 +162,13 @@ class Lw(Instruction):
 
     def execute(self, packet: Packet):
         if packet.stage == Stage.EX:
-            rs_val = packet.pool.request(self.rs, Stage.EX, packet)
+            rs_val = packet.pool.request(self.rs, packet.stage)
             addr = rs_val + self.imm16_signed
             packet.optional["mem_addr"] = addr 
         
         elif packet.stage == Stage.MEM:
             mem_val = packet.cpu.mem.read(packet.optional["mem_addr"])
-            packet.alu[self.rt] = Change(origin=packet.pool.request(self.rd, Stage.EX, packet), new=mem_val, reason="lw")
+            packet.alu[self.rt] = Change(origin=packet.pool.request(self.rt, packet.stage), new=mem_val, reason="lw")
 
 @instr(opcode=0b000100, tuse_rs=Stage.ID, tuse_rt=Stage.ID)
 class Beq(Instruction):
@@ -191,8 +181,8 @@ class Beq(Instruction):
     def execute(self, packet: Packet):
         if packet.stage != Stage.ID:
             return
-        rs_val = packet.pool.request(self.rs, Stage.ID, packet)
-        rt_val = packet.pool.request(self.rt, Stage.ID, packet)
+        rs_val = packet.pool.request(self.rs, packet.stage)
+        rt_val = packet.pool.request(self.rt, packet.stage)
         if rs_val == rt_val:
             packet.npc = packet.pc + 4 + (self.imm16_signed << 2)
 

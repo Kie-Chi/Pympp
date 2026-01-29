@@ -1,54 +1,34 @@
-from dataclasses import dataclass, field
-from typing import Dict
-from .isa import Change, Packet
 from .base import Stage, PIPELINE
+from .behaviors import ForwardBehavior, StallBehavior
 
-@dataclass
-class ForwardRecord:
-    val: int          # data
-    pc: int           # PC
-    stage: Stage      # (EX/MEM/WB)
-    timestamp: int    # time
-
-@dataclass
-class PendingInfo:
-    pc: int
-    stage: Stage
-    remaining: int = 0 # remain how many cycles
+class StallException(Exception):
+    def __init__(self, reason: str):
+        self.reason = reason
 
 class Pool:
     def __init__(self, cpu):
         self.cpu = cpu
-        self.pending: Dict[int, PendingInfo] = {} 
-        self.reported: Dict[int, ForwardRecord] = {}
 
-    def mark_pending(self, reg: int, tnew_stage: Stage, pc: int):
-        if reg == 0: return
-        self.pending[reg] = PendingInfo(pc, tnew_stage)
+    def request(self, reg: int, current_stage: Stage) -> int:
+        if reg == 0: return 0
+        
+        current_packet = self.cpu.slots[current_stage]
+        t_use = current_packet.instr.tuse_rs if reg == current_packet.instr.rs else current_packet.instr.tuse_rt
 
-    def report(self, reg: int, val: int, pc: int, stage: Stage):
-        if reg == 0: return
-        self.reported[reg] = ForwardRecord(val, pc, stage, self.cpu.cycle)
-    
-    def clear_pending(self, pc: int):
-        regs_to_clear = [r for r, p in self.pending.items() if p.pc == pc]
-        for r in regs_to_clear:
-            del self.pending[r]
-    
-    def flush_reported(self):
-        self.reported.clear()
-
-    def request(self, reg: int, tuse_stage: Stage, packet: Packet) -> int:
-        if reg == 0:
-            return 0
-        if reg in self.pending:
-            pending_info = self.pending[reg]
-            if pending_info.stage == Stage.MEM and tuse_stage == Stage.EX:
-                packet.stall = True
-                packet.s_reason = f"Stall for R{reg} (LW-USE hazard from PC={hex(pending_info.pc)})"
-                return -1
-        if reg in self.reported:
-            fwd_record = self.reported[reg]
-            packet.f_reasons[reg] = f"Forward R{reg} from {fwd_record.stage.name} (PC={hex(fwd_record.pc)})"
-            return fwd_record.val
+        for s in [Stage.EX, Stage.MEM, Stage.WB]:
+            prod_packet = self.cpu.slots[s]
+            if not prod_packet: continue
+            if reg in prod_packet.alu:
+                t_new = prod_packet.instr.remaining(s)
+                if current_stage == Stage.ID:
+                    t_use_val = max(0, t_use.value - Stage.ID.value)
+                    if t_use_val < t_new:
+                        raise StallException(f"Hazard on ${reg}: Tuse({t_use_val}) < Tnew({t_new})")
+                
+                if t_new == 0:
+                    forward_val = prod_packet.alu[reg].new
+                    self.cpu.log_behavior(ForwardBehavior(
+                        self.cpu.cycle, current_packet.pc, reg, forward_val, s.name, current_stage.name
+                    ))
+                    return forward_val
         return self.cpu.regs[reg]

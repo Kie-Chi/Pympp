@@ -18,6 +18,9 @@ class Stage(Enum):
     def __eq__(self, other):
         return self.value == other.value
 
+    def __sub__(self, other):
+        return self.value - other.value
+
 PIPELINE = {
     Stage.BEGIN: Stage.IF,
     Stage.IF: Stage.ID,

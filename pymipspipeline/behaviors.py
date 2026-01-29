@@ -1,59 +1,72 @@
+from dataclasses import dataclass, asdict, field
 from enum import Enum
-from dataclasses import dataclass, field
-from typing import Dict, Any, Optional
+from typing import Optional, Dict, Any, List
 from .base import Stage
 
 @dataclass
 class Behavior:
+    """base behavior"""
+    cycle: int
     pc: int
-    stage: Stage
-    message: str
-    is_right: bool = True
 
-    def serialize(self, prefix: Optional[str] = None) -> str:
-        prefix_char = prefix if prefix is not None else ('@' if self.is_right else '!')
-        return f"{prefix_char}{self.pc:08x}: {self.message}"
+    def to_dict(self):
+        d = asdict(self)
+        d["type"] = self.__class__.__name__
+        return d
+
 
 @dataclass
-class RegisterWriteBehavior(Behavior):
+class StageStatus(Behavior):
+    """pipeline status"""
+    stage: str
+    instr_name: str
+    disasm: str
+    t_new: int
+    is_bubble: bool = False
+
+
+@dataclass
+class RegReadBehavior(Behavior):
+    """register read"""
     reg: int
-    value: int
-
-    def __post_init__(self):
-        self.message = f"${self.reg:2d} <= {self.value:08x}"
+    val: int
+    stage: str
 
 @dataclass
-class MemoryWriteBehavior(Behavior):
-    address: int
-    value: int
-
-    def __post_init__(self):
-        self.message = f"*{self.address:08x} <= {self.value:08x}"
-
-@dataclass
-class ModifyPCBehavior(Behavior):
-    target_pc: int
-
-    def __post_init__(self):
-        self.message = f"PC <= {self.target_pc:08x}"
+class RegWriteBehavior(Behavior):
+    """register write back"""
+    reg: int
+    val: int
 
 @dataclass
 class ForwardBehavior(Behavior):
+    """forward behavior"""
     reg: int
-    value: int
-    source_stage: Stage
-    target_stage: Stage
+    val: int
+    from_stage: str
+    to_stage: str
 
-    def __post_init__(self):
-        self.message = f"{self.target_stage} <--(${self.reg:2d}: {self.value:08x})-- {self.source_stage}"
+
+class MemOp(Enum):
+    READ = "READ"
+    WRITE = "WRITE"
+
+@dataclass
+class MemOpBehavior(Behavior):
+    """memory operation"""
+    op: MemOp
+    addr: int
+    val: int
 
 @dataclass
 class StallBehavior(Behavior):
-    source_stage: Stage
-    reason_reg: Optional[int] = None
+    """stall behavior"""
+    stage: str
+    reason: str
 
-    def __post_init__(self):
-        if self.reason_reg is not None:
-            self.message = f"{self.source_stage} ---x--> {self.source_stage.value + 1} (reg ${self.reason_reg})"
-        else:
-            self.message = f"{self.source_stage} ---x--> {self.source_stage.value + 1}"
+@dataclass
+class BranchBehavior(Behavior):
+    """branch behavior"""
+    target_pc: int
+    taken: bool
+

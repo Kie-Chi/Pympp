@@ -1,150 +1,123 @@
-from collections import deque
-from typing import Dict, Optional 
-from .isa import decode, Packet, Instruction
+from typing import List, Dict, Optional, Any
+from dataclasses import dataclass, asdict
+from .base import Stage, StallException
+from .behaviors import StageStatus, RegWriteBehavior, MemOpBehavior, BranchBehavior, StallBehavior
 from .pipeline import Pool
-from .base import Stage
+from .isa import Instruction, Packet, decode
+
+@dataclass
+class Snapshot:
+    """
+    snapshot for pipeline cpu at each cycle
+    """
+    cycle: int
+    pc: int
+    pipeline: Dict[str, Optional[Dict[str, Any]]] 
+    behaviors: List[Dict[str, Any]]
+    registers: List[int]
+
+    def to_dict(self):
+        return asdict(self)
 
 class CPU:
-    def __init__(self, machine_codes: list[int]):
+    def __init__(self, machine_codes: List[int]):
         self.pc = 0x3000
         self.regs = [0] * 32
-        self.mem = {i: code for i, code in enumerate(machine_codes)}
+        self.imem = machine_codes
+        self.dmem = {}
         self.cycle = 0
-
-        self.pipeline_stages: Dict[Stage, Optional[Packet]] = {s: None for s in Stage}
+        self.slots: Dict[Stage, Optional[Packet]] = {s: None for s in Stage}
         self.pool = Pool(self)
-        self.halt = False        
+        
+        self.current_behaviors = []
         self.history = []
 
+    def log_behavior(self, b):
+        self.current_behaviors.append(b)
+
     def step(self):
-        if self.halt:
-            return
-
         self.cycle += 1
-        self.pool.flush_reported()
+        self.current_behaviors = []
+        self._stage_wb()
+        self._stage_mem()
+        self._stage_ex()
+        is_stalled = self._stage_id()
+        self._stage_if(is_stalled)
+        self.capture_snapshot()
 
-        self._do_wb()
-        self._do_mem()
-        self._do_ex()
-        self._do_id()
-        self._do_if()
+    def _stage_wb(self):
+        p = self.slots[Stage.WB]
+        if not p: return
+        for reg_id, change in p.alu.items():
+            if reg_id != 0:
+                self.regs[reg_id] = change.new
+                self.log_behavior(RegWriteBehavior(self.cycle, p.pc, reg_id, change.new))
 
-        self.log_cycle_state()
-    
-    def run(self, max_cycles=1000):
-        """运行模拟器直到结束"""
-        while self.cycle < max_cycles and not self.halt:
-            self.step()
+    def _stage_mem(self):
+        p = self.slots[Stage.MEM]
+        if p:
+            p.stage = Stage.MEM
+            p.instr.execute(p)
+        self.slots[Stage.WB] = p
 
-    def _do_wb(self):
-        packet = self.pipeline_stages[Stage.WB]
-        if not packet: return
+    def _stage_ex(self):
+        p = self.slots[Stage.EX]
+        if p:
+            p.stage = Stage.EX
+            p.instr.execute(p)
+        self.slots[Stage.MEM] = p
 
-        # 写回寄存器
-        if packet.alu:
-            reg, change = list(packet.alu.items())[0]
-            if reg != 0:
-                self.regs[reg] = change.new
-                # 报告最终值，给同一周期需要此值的指令使用 (非常少见，但可能)
-                self.pool.report(reg, change.new, packet.pc, Stage.WB)
-        
-        # 清理pending
-        self.pool.clear_pending(packet.pc)
-        
-        if isinstance(packet.instr, Beq) and packet.instr.rs == 0 and packet.instr.rt == 0 and packet.instr.imm16_signed == -1:
-            self.halt = True
+    def _stage_id(self) -> bool:
+        p = self.slots[Stage.ID]
+        if not p:
+            self.slots[Stage.EX] = None
+            return False
 
-        self.pipeline_stages[Stage.WB] = None # 清空WB级
+        try:
+            p.stage = Stage.ID
+            p.instr.execute(p) 
+            self.slots[Stage.EX] = p
+            return False
 
-    def _do_mem(self):
-        packet = self.pipeline_stages[Stage.MEM]
-        if not packet:
-            self.pipeline_stages[Stage.WB] = None
+        except StallException as e:
+            self.slots[Stage.EX] = None
+            self.log_behavior(StallBehavior(self.cycle, p.pc, "ID", str(e)))
+            return True
+
+    def _stage_if(self, is_stalled: bool):
+        if is_stalled:
             return
+        p_id = self.slots[Stage.ID]
+        fetch_pc = p_id.npc if (p_id and p_id.npc != p_id.pc + 4) else self.pc
+        self.pc = fetch_pc 
 
-        packet.instr.execute(packet)
-        if packet.alu: # 如果是 lw，数据在MEM阶段产生
-            reg, change = list(packet.alu.items())[0]
-            self.pool.report(reg, change.new, packet.pc, Stage.MEM)
-
-        self.pipeline_stages[Stage.WB] = packet
-
-    def _do_ex(self):
-        packet = self.pipeline_stages[Stage.EX]
-        if not packet:
-            self.pipeline_stages[Stage.MEM] = None
-            return
-
-        packet.instr.execute(packet)
-        if packet.alu: # 如果是R-Type，数据在EX阶段产生
-            reg, change = list(packet.alu.items())[0]
-            self.pool.report(reg, change.new, packet.pc, Stage.EX)
-
-        self.pipeline_stages[Stage.MEM] = packet
-
-    def _do_id(self):
-        packet = self.pipeline_stages[Stage.ID]
-        if not packet:
-            self.pipeline_stages[Stage.EX] = None
-            return
-
-        # 这是最复杂的部分：解码和冒险检测
-        machine_code = self.mem.get((packet.pc - 0x3000) // 4, 0)
-        packet.instr = decode(machine_code, packet.pc)
-        packet.disassembly = packet.instr.disassemble()
-
-        # 执行指令的ID阶段部分（主要用于分支）
-        packet.instr.execute(packet)
-
-        # 检查是否需要stall
-        if packet.stall:
-            # 插入气泡，ID和EX之间是NOP
-            self.pipeline_stages[Stage.EX] = None 
-            # IF阶段的指令需要被重新取，所以PC不更新
-            # ID阶段的指令保持不变，下一周期再试
-            return
-
-        # 如果不stall，标记目标寄存器
-        wreg = packet.instr.get_wreg()
-        if wreg is not None:
-            self.pool.mark_pending(wreg, packet.instr.tnew, packet.pc)
-
-        # 指令进入下一阶段
-        self.pipeline_stages[Stage.EX] = packet
-
-    def _do_if(self):
-        # 如果ID阶段暂停了，IF也必须暂停，PC不自增
-        if self.pipeline_stages[Stage.ID] and self.pipeline_stages[Stage.ID].stall:
-             # self.pc 保持不变
-             return
-
-        # 创建新packet
-        packet = Packet(pool=self.pool, pc=self.pc, cpu=self)
-        self.pipeline_stages[Stage.ID] = packet
-
-        # 更新PC以获取下一条指令
-        # 默认 PC+4，但ID阶段的分支指令可能会修改它
-        id_packet = self.pipeline_stages[Stage.EX] # 注意：由于是从后往前，EX级里现在是上一条的ID级packet
-        if id_packet and id_packet.npc != id_packet.pc + 4:
-            self.pc = id_packet.npc # 分支跳转
+        idx = (fetch_pc - 0x3000) // 4
+        if 0 <= idx < len(self.imem):
+            instr_code = self.imem[idx]
+            instr = decode(instr_code, fetch_pc)
+            self.slots[Stage.ID] = Packet(pool=self.pool, pc=fetch_pc, instr=instr, cpu=self)
+            self.pc += 4
         else:
-            self.pc += 4 # 正常执行
+            self.slots[Stage.ID] = None
 
-    def log_cycle_state(self):
-        # 在这里记录你想要的所有信息
-        state = {
+    def capture_snapshot(self):
+        pipeline_snap = {}
+        for s in [Stage.IF, Stage.ID, Stage.EX, Stage.MEM, Stage.WB]:
+            p = self.slots[s]
+            if p:
+                pipeline_snap[s.name] = StageStatus(
+                    cycle=self.cycle, pc=p.pc, stage=s.name,
+                    instr_name=p.instr.__class__.__name__.lower(),
+                    disasm=p.instr.disassemble(),
+                    t_new=p.instr.remaining(s)
+                ).to_dict()
+            else:
+                pipeline_snap[s.name] = None
+        self.history.append({
             "cycle": self.cycle,
             "pc": self.pc,
-            "regs": list(self.regs),
-            "pipeline": {
-                stage.name: p.disassembly if p else "---" 
-                for stage, p in self.pipeline_stages.items()
-            },
-            "stalls": [p.s_reason for p in self.pipeline_stages.values() if p and p.stall],
-            "forwards": [p.f_reasons for p in self.pipeline_stages.values() if p and p.f_reasons],
-        }
-        self.history.append(state)
-        # 你可以打印出来，或者存到文件
-        print(f"Cycle {state['cycle']}: {state['pipeline']}")
-        if state['stalls']: print(f"  Stalls: {state['stalls']}")
-        if state['forwards']: print(f"  Forwards: {state['forwards']}")
+            "gpr": self.regs.copy(),
+            "memory": self.dmem.copy(),
+            "pipeline": pipeline_snap,
+            "behaviors": self.current_behaviors.copy(),
+        })
