@@ -77,6 +77,7 @@ class CPU:
         self.dmem: Memory = Memory(self)
         self.cycle = 0
         self.slots: Dict[Stage, Optional[Packet]] = {s: None for s in Stage}
+        self.shadows = None
         self.pool: Pool = Pool(self)
         
         self.current_behaviors: List[Behavior] = []
@@ -88,6 +89,7 @@ class CPU:
     def step(self):
         self.cycle += 1
         self.current_behaviors = []
+        self.shadows = self.slots.copy()
         self._stage_wb()
         self._stage_mem()
         self._stage_ex()

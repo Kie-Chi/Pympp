@@ -34,7 +34,7 @@ class Pool:
         curpkt = self.cpu.slots[cur_stage]
         s = PIPELINE[cur_stage]
         while s is not None and s != Stage.END:
-            prod_packet = self.cpu.slots[s]
+            prod_packet = self.cpu.shadows[s]
             if not prod_packet: 
                 s = PIPELINE[s]
                 continue

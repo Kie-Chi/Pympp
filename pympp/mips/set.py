@@ -88,11 +88,11 @@ class Lw(Instruction):
     def execute(self, packet: Packet):
         if packet.stage == Stage.EX:
             rs_val = packet.pool.read_reg(self.rs, packet.stage)
-            addr = rs_val.value + self.imm16_signed
+            addr = rs_val + self.imm16_signed
             packet.optional["mem_addr"] = addr 
         
         elif packet.stage == Stage.MEM:
-            mem_val = packet.pool.read_mem(packet.optional["mem_addr"])
+            mem_val = packet.pool.read_mem(packet.optional["mem_addr"].value)
             packet.pool.write_reg(packet, self.rt, mem_val, "lw")
 
 @instr(opcode=0b101011, tuse_rs=Stage.EX, tuse_rt=Stage.MEM)
@@ -106,11 +106,11 @@ class Sw(Instruction):
     def execute(self, packet: Packet):
         if packet.stage == Stage.EX:
             rs_val = packet.pool.read_reg(self.rs, packet.stage)
-            addr = rs_val.value + self.imm16_signed
+            addr = rs_val + self.imm16_signed
             packet.optional["mem_addr"] = addr
         
         elif packet.stage == Stage.MEM:
-            addr = packet.optional["mem_addr"]
+            addr = packet.optional["mem_addr"].value
             rt_val = packet.pool.read_reg(self.rt, packet.stage)
             packet.pool.write_mem(packet, addr, rt_val)
 
