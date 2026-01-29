@@ -46,15 +46,15 @@ class ForwardBehavior(Behavior):
     from_stage: str
     to_stage: str
 
-
-class MemOp(Enum):
-    READ = "READ"
-    WRITE = "WRITE"
+@dataclass
+class MemReadBehavior(Behavior):
+    """memory read"""
+    addr: int
+    val: int
 
 @dataclass
-class MemOpBehavior(Behavior):
-    """memory operation"""
-    op: MemOp
+class MemWriteBehavior(Behavior):
+    """memory write back"""
     addr: int
     val: int
 

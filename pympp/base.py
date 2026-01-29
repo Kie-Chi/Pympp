@@ -18,6 +18,9 @@ class Stage(Enum):
     def __eq__(self, other):
         return self.value == other.value
 
+    def __hash__(self):
+        return hash(self.value)
+
     def __sub__(self, other):
         return self.value - other.value
 
@@ -29,3 +32,7 @@ PIPELINE = {
     Stage.MEM: Stage.WB,
     Stage.WB: Stage.END,
 }
+
+class StallException(Exception):
+    def __init__(self, reason: str):
+        self.reason = reason

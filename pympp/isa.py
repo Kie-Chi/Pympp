@@ -54,10 +54,9 @@ class Packet:
     pool: Pool
 
     pc: int
+    instr: Type['Instruction']
     npc: int = None
     stage: Stage = Stage.IF
-    
-    instr: Type['Instruction']
     
     alu: Dict[int, Change] = field(default_factory=dict)
     mem: Dict[int, Change] = field(default_factory=dict)
@@ -167,7 +166,7 @@ class Lw(Instruction):
             packet.optional["mem_addr"] = addr 
         
         elif packet.stage == Stage.MEM:
-            mem_val = packet.cpu.mem.read(packet.optional["mem_addr"])
+            mem_val = packet.pool.cpu.dmem.get(packet.optional["mem_addr"], 0)
             packet.alu[self.rt] = Change(origin=packet.pool.request(self.rt, packet.stage), new=mem_val, reason="lw")
 
 @instr(opcode=0b000100, tuse_rs=Stage.ID, tuse_rt=Stage.ID)

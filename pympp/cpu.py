@@ -1,9 +1,9 @@
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass, asdict
 from .base import Stage, StallException
-from .behaviors import StageStatus, RegWriteBehavior, MemOpBehavior, BranchBehavior, StallBehavior
+from .behaviors import StageStatus, RegWriteBehavior, MemReadBehavior, MemWriteBehavior, BranchBehavior, StallBehavior, RegReadBehavior
 from .pipeline import Pool
-from .isa import Instruction, Packet, decode
+from .mips.isa import Instruction, Packet, decode
 
 @dataclass
 class Snapshot:
@@ -19,12 +19,59 @@ class Snapshot:
     def to_dict(self):
         return asdict(self)
 
+class RegisterFile:
+    def __init__(self, cpu):
+        self.cpu = cpu
+        self.regs = [0] * 32
+
+    def __getitem__(self, key):
+        return self.regs[key]
+
+    def __setitem__(self, key, value):
+        self.regs[key] = value
+
+    def __iter__(self):
+        return iter(self.regs)
+
+    def copy(self):
+        return self.regs.copy()
+
+    def read(self, reg_id, stage, pc):
+        val = self.regs[reg_id]
+        self.cpu.log_behavior(RegReadBehavior(self.cpu.cycle, pc, reg_id, val, stage))
+        return val
+
+    def write(self, reg_id, value, pc):
+        if reg_id != 0:
+            self.regs[reg_id] = value
+            self.cpu.log_behavior(RegWriteBehavior(self.cpu.cycle, pc, reg_id, value))
+
+class Memory:
+    def __init__(self, cpu):
+        self.cpu = cpu
+        self.data = {}
+
+    def read(self, addr, pc):
+        val = self.data.get(addr, 0)
+        self.cpu.log_behavior(MemReadBehavior(self.cpu.cycle, pc, addr, val))
+        return val
+    
+    def get(self, addr, default=0):
+        return self.data.get(addr, default)
+
+    def copy(self):
+        return self.data.copy()
+
+    def write(self, addr, value, pc):
+        self.data[addr] = value
+        self.cpu.log_behavior(MemWriteBehavior(self.cpu.cycle, pc, addr, value))
+
 class CPU:
     def __init__(self, machine_codes: List[int]):
         self.pc = 0x3000
-        self.regs = [0] * 32
+        self.regs = RegisterFile(self)
         self.imem = machine_codes
-        self.dmem = {}
+        self.dmem = Memory(self)
         self.cycle = 0
         self.slots: Dict[Stage, Optional[Packet]] = {s: None for s in Stage}
         self.pool = Pool(self)
@@ -48,22 +95,23 @@ class CPU:
     def _stage_wb(self):
         p = self.slots[Stage.WB]
         if not p: return
+        p.advance()
         for reg_id, change in p.alu.items():
-            if reg_id != 0:
-                self.regs[reg_id] = change.new
-                self.log_behavior(RegWriteBehavior(self.cycle, p.pc, reg_id, change.new))
+            self.regs.write(reg_id, change.new, p.pc)
 
     def _stage_mem(self):
         p = self.slots[Stage.MEM]
         if p:
-            p.stage = Stage.MEM
+            p.advance()
             p.instr.execute(p)
+            for addr, change in p.mem.items():
+                self.dmem.write(addr, change.new, p.pc)
         self.slots[Stage.WB] = p
 
     def _stage_ex(self):
         p = self.slots[Stage.EX]
         if p:
-            p.stage = Stage.EX
+            p.advance()
             p.instr.execute(p)
         self.slots[Stage.MEM] = p
 
@@ -74,7 +122,9 @@ class CPU:
             return False
 
         try:
-            p.stage = Stage.ID
+            if p.stage != Stage.ID:
+                p.advance()
+            self.pool.check_stall(p)
             p.instr.execute(p) 
             self.slots[Stage.EX] = p
             return False
@@ -87,16 +137,22 @@ class CPU:
     def _stage_if(self, is_stalled: bool):
         if is_stalled:
             return
+        
+        fetch_pc = self.pc
+        # origin ID instr now in EX stage
         p_id = self.slots[Stage.ID]
-        fetch_pc = p_id.npc if (p_id and p_id.npc != p_id.pc + 4) else self.pc
-        self.pc = fetch_pc 
+        if p_id and p_id.npc != p_id.pc + 4:
+            self.pc = p_id.npc
+        else:
+            self.pc += 4
 
         idx = (fetch_pc - 0x3000) // 4
         if 0 <= idx < len(self.imem):
             instr_code = self.imem[idx]
             instr = decode(instr_code, fetch_pc)
-            self.slots[Stage.ID] = Packet(pool=self.pool, pc=fetch_pc, instr=instr, cpu=self)
-            self.pc += 4
+            self.slots[Stage.ID] = Packet(pool=self.pool, pc=fetch_pc, instr=instr)
+            if p_id and p_id.npc != p_id.pc + 4:
+                self.log_behavior(BranchBehavior(self.cycle, p_id.pc, p_id.npc, taken=True))
         else:
             self.slots[Stage.ID] = None
 
