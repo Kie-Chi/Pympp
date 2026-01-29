@@ -26,7 +26,7 @@ class Pool:
                     raise StallException(f"Hazard on ${reg}: Tuse({t_use_val}) < Tnew({t_new})")
                 return # Found the latest producer
 
-    def request(self, reg: int, cur_stage: Stage) -> int:
+    def read_reg(self, reg: int, cur_stage: Stage) -> int:
         if reg == 0: return 0
         
         curpkt = self.cpu.slots[cur_stage]
@@ -52,5 +52,17 @@ class Pool:
                             self.cpu.cycle, curpkt.pc, reg, forward_val, s.name, cur_stage.name
                         ))
                         return forward_val
-                return self.cpu.regs.read(reg, cur_stage.name, curpkt.pc)
-        return self.cpu.regs.read(reg, cur_stage.name, curpkt.pc)
+                return self.cpu.regs.read(reg)
+        return self.cpu.regs.read(reg)
+
+    def read_mem(self, addr: int) -> int:
+        return self.cpu.dmem.read(addr)
+
+    def write_reg(self, packet, reg: int, val: int, reason: str):
+        if reg == 0: return
+        from .isa import Change
+        packet.alu[reg] = Change(origin=self.read_reg(reg, packet.stage), new=val, reason=reason)
+
+    def write_mem(self, packet, addr: int, val: int):
+        from .isa import Change
+        packet.mem[addr] = Change(origin=self.read_mem(addr), new=val, reason="mem_write")

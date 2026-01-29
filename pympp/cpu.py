@@ -1,7 +1,7 @@
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass, asdict
 from .base import Stage, StallException
-from .behaviors import StageStatus, RegWriteBehavior, MemReadBehavior, MemWriteBehavior, BranchBehavior, StallBehavior, RegReadBehavior
+from .behaviors import StageStatus, RegWriteBehavior,MemWriteBehavior, BranchBehavior, StallBehavior
 from .pipeline import Pool
 from .mips.isa import Instruction, Packet, decode
 
@@ -36,9 +36,8 @@ class RegisterFile:
     def copy(self):
         return self.regs.copy()
 
-    def read(self, reg_id, stage, pc):
+    def read(self, reg_id):
         val = self.regs[reg_id]
-        self.cpu.log_behavior(RegReadBehavior(self.cpu.cycle, pc, reg_id, val, stage))
         return val
 
     def write(self, reg_id, value, pc):
@@ -51,9 +50,8 @@ class Memory:
         self.cpu = cpu
         self.data = {}
 
-    def read(self, addr, pc):
+    def read(self, addr):
         val = self.data.get(addr, 0)
-        self.cpu.log_behavior(MemReadBehavior(self.cpu.cycle, pc, addr, val))
         return val
     
     def get(self, addr, default=0):

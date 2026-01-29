@@ -25,12 +25,12 @@ class StageStatus(Behavior):
     is_bubble: bool = False
 
 
-@dataclass
-class RegReadBehavior(Behavior):
-    """register read"""
-    reg: int
-    val: int
-    stage: str
+# @dataclass
+# class RegReadBehavior(Behavior):
+#     """register read"""
+#     reg: int
+#     val: int
+#     stage: str
 
 @dataclass
 class RegWriteBehavior(Behavior):
@@ -46,11 +46,11 @@ class ForwardBehavior(Behavior):
     from_stage: str
     to_stage: str
 
-@dataclass
-class MemReadBehavior(Behavior):
-    """memory read"""
-    addr: int
-    val: int
+# @dataclass
+# class MemReadBehavior(Behavior):
+#     """memory read"""
+#     addr: int
+#     val: int
 
 @dataclass
 class MemWriteBehavior(Behavior):

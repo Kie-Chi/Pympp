@@ -1,3 +1,4 @@
+from struct import pack
 from typing import Optional
 from .isa import instr, Instruction, Packet, Change
 from ..base import Stage
@@ -26,10 +27,10 @@ class Add(Instruction):
     def execute(self, packet: Packet):
         if packet.stage != Stage.EX:
             return
-        rs_val = packet.pool.request(self.rs, packet.stage)
-        rt_val = packet.pool.request(self.rt, packet.stage)
+        rs_val = packet.pool.read_reg(self.rs, packet.stage)
+        rt_val = packet.pool.read_reg(self.rt, packet.stage)
         result = rs_val + rt_val
-        packet.alu[self.rd] = Change(origin=packet.pool.request(self.rd, packet.stage), new=result, reason="add")
+        packet.pool.write_reg(packet, self.rd, result, "add")
 
 @instr(opcode=0, funct=0b100010, tuse_rs=Stage.EX, tuse_rt=Stage.EX, tnew=Stage.MEM)
 class Sub(Instruction):
@@ -42,10 +43,10 @@ class Sub(Instruction):
     def execute(self, packet: Packet):
         if packet.stage != Stage.EX:
             return
-        rs_val = packet.pool.request(self.rs, packet.stage)
-        rt_val = packet.pool.request(self.rt, packet.stage)
+        rs_val = packet.pool.read_reg(self.rs, packet.stage)
+        rt_val = packet.pool.read_reg(self.rt, packet.stage)
         result = rs_val - rt_val
-        packet.alu[self.rd] = Change(origin=packet.pool.request(self.rd, packet.stage), new=result, reason="sub")
+        packet.pool.write_reg(packet, self.rd, result, "sub")
 
 @instr(opcode=0b001111, tnew=Stage.MEM)
 class Lui(Instruction):
@@ -59,10 +60,9 @@ class Lui(Instruction):
         if packet.stage != Stage.EX:
             return
         result = self.imm16 << 16
-        packet.alu[self.rt] = Change(origin=packet.pool.request(self.rt, packet.stage), new=result, reason="lui")
+        packet.pool.write_reg(packet, self.rt, result, "lui")
 
-
-@instr(opcode=0b001101, tuse_rs=Stage.EX, tnew=Stage.MEM)
+@instr(opcode=0b001101, tuse_rs=Stage.EX, tnew=Stage.EX)
 class Ori(Instruction):
     def get_wreg(self) -> Optional[int]:
         return self.rt
@@ -73,9 +73,9 @@ class Ori(Instruction):
     def execute(self, packet: Packet):
         if packet.stage != Stage.EX:
             return
-        rs_val = packet.pool.request(self.rs, packet.stage)
+        rs_val = packet.pool.read_reg(self.rs, packet.stage)
         result = rs_val | self.imm16
-        packet.alu[self.rt] = Change(origin=packet.pool.request(self.rt, packet.stage), new=result, reason="ori")
+        packet.pool.write_reg(packet, self.rt, result, "ori")
 
 
 @instr(opcode=0b100011, tuse_rs=Stage.EX, tnew=Stage.WB)
@@ -88,13 +88,13 @@ class Lw(Instruction):
 
     def execute(self, packet: Packet):
         if packet.stage == Stage.EX:
-            rs_val = packet.pool.request(self.rs, packet.stage)
+            rs_val = packet.pool.read_reg(self.rs, packet.stage)
             addr = rs_val + self.imm16_signed
             packet.optional["mem_addr"] = addr 
         
         elif packet.stage == Stage.MEM:
-            mem_val = packet.pool.cpu.dmem.read(packet.optional["mem_addr"], packet.pc)
-            packet.alu[self.rt] = Change(origin=packet.pool.request(self.rt, packet.stage), new=mem_val, reason="lw")
+            mem_val = packet.pool.read_mem(packet.optional["mem_addr"])
+            packet.pool.write_reg(packet, self.rt, mem_val, "lw")
 
 @instr(opcode=0b101011, tuse_rs=Stage.EX, tuse_rt=Stage.MEM)
 class Sw(Instruction):
@@ -106,14 +106,14 @@ class Sw(Instruction):
 
     def execute(self, packet: Packet):
         if packet.stage == Stage.EX:
-            rs_val = packet.pool.request(self.rs, packet.stage)
+            rs_val = packet.pool.read_reg(self.rs, packet.stage)
             addr = rs_val + self.imm16_signed
             packet.optional["mem_addr"] = addr
         
         elif packet.stage == Stage.MEM:
             addr = packet.optional["mem_addr"]
-            rt_val = packet.pool.request(self.rt, packet.stage)
-            packet.pool.cpu.dmem.write(addr, rt_val, packet.pc)
+            rt_val = packet.pool.read_reg(self.rt, packet.stage)
+            packet.pool.write_mem(addr, rt_val)
 
 
 @instr(opcode=0b000100, tuse_rs=Stage.ID, tuse_rt=Stage.ID)
@@ -127,8 +127,8 @@ class Beq(Instruction):
     def execute(self, packet: Packet):
         if packet.stage != Stage.ID:
             return
-        rs_val = packet.pool.request(self.rs, packet.stage)
-        rt_val = packet.pool.request(self.rt, packet.stage)
+        rs_val = packet.pool.read_reg(self.rs, packet.stage)
+        rt_val = packet.pool.read_reg(self.rt, packet.stage)
         if rs_val == rt_val:
             packet.npc = packet.pc + 4 + (self.imm16_signed << 2)
 
@@ -144,7 +144,7 @@ class Jr(Instruction):
         if packet.stage != Stage.ID:
             return
         
-        rs_val = packet.pool.request(self.rs, packet.stage)
+        rs_val = packet.pool.read_reg(self.rs, packet.stage)
         packet.npc = rs_val
 
 @instr(opcode=0b000011, tnew=Stage.EX)
@@ -161,7 +161,7 @@ class Jal(Instruction):
             target_addr = (self.imm26 << 2) | ((packet.pc + 4) & 0xF0000000)
             packet.npc = target_addr
             return_addr = packet.pc + 8
-            packet.alu[31] = Change(origin=-1, new=return_addr, reason="jal")
+            packet.pool.write_reg(packet, 31, return_addr, "jal")
 
 @instr(opcode=0, funct=0) # Nop is usually all zeros
 class Nop(Instruction):
