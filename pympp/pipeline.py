@@ -1,3 +1,4 @@
+from pympp.util.type import Word, to_word
 from .base import Stage, PIPELINE, StallException
 from .behaviors import ForwardBehavior, StallBehavior
 
@@ -26,13 +27,17 @@ class Pool:
                     raise StallException(f"Hazard on ${reg}: Tuse({t_use_val}) < Tnew({t_new})")
                 return # Found the latest producer
 
-    def read_reg(self, reg: int, cur_stage: Stage) -> int:
-        if reg == 0: return 0
+    def read_reg(self, reg: int, cur_stage: Stage, log: bool = True) -> Word:
+        if reg == 0: 
+            return Word(0)
         
         curpkt = self.cpu.slots[cur_stage]
-        for s in [Stage.EX, Stage.MEM, Stage.WB]:
+        s = PIPELINE[cur_stage]
+        while s is not None and s != Stage.END:
             prod_packet = self.cpu.slots[s]
-            if not prod_packet: continue
+            if not prod_packet: 
+                s = PIPELINE[s]
+                continue
             
             if prod_packet.instr.get_wreg() == reg:
                 t_new = prod_packet.instr.remaining(s)
@@ -48,21 +53,25 @@ class Pool:
                     # Value must be available if t_new == 0
                     if reg in prod_packet.alu:
                         forward_val = prod_packet.alu[reg].new
-                        self.cpu.log_behavior(ForwardBehavior(
-                            self.cpu.cycle, curpkt.pc, reg, forward_val, s.name, cur_stage.name
-                        ))
+                        if log:
+                            self.cpu.log_behavior(ForwardBehavior(
+                                self.cpu.cycle, curpkt.pc, reg, forward_val.value, s.name, cur_stage.name
+                            ))
                         return forward_val
                 return self.cpu.regs.read(reg)
+            s = PIPELINE[s]
         return self.cpu.regs.read(reg)
 
-    def read_mem(self, addr: int) -> int:
+    def read_mem(self, addr: int) -> Word:
         return self.cpu.dmem.read(addr)
 
-    def write_reg(self, packet, reg: int, val: int, reason: str):
+    def write_reg(self, packet, reg: int, val, reason: str):
         if reg == 0: return
-        from .isa import Change
-        packet.alu[reg] = Change(origin=self.read_reg(reg, packet.stage), new=val, reason=reason)
+        from .mips.isa import Change
+        val_word = Word(val)
+        packet.alu[reg] = Change(origin=self.read_reg(reg, packet.stage, log=False), new=val_word, reason=reason)
 
-    def write_mem(self, packet, addr: int, val: int):
-        from .isa import Change
-        packet.mem[addr] = Change(origin=self.read_mem(addr), new=val, reason="mem_write")
+    def write_mem(self, packet, addr: int, val):
+        from .mips.isa import Change
+        val_word = Word(val)
+        packet.mem[addr] = Change(origin=self.read_mem(addr), new=val_word, reason="mem_write")

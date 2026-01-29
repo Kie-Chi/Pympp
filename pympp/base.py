@@ -1,6 +1,7 @@
 
 from functools import total_ordering
 from enum import Enum
+from .util.type import Word, Half, Byte
 
 @total_ordering
 class Stage(Enum):

@@ -4,6 +4,8 @@ from struct import pack
 from tkinter import Pack
 from typing import Optional, Dict, Any, Type, List
 from pydantic import BaseModel
+
+from ..util.type import Word, to_word
 from ..behaviors import Behavior
 from ..pipeline import PIPELINE, Pool, Stage
 
@@ -41,11 +43,11 @@ def decode(machine_code: int, pc: int) -> 'Instruction':
 
 @dataclass
 class Change:
-    origin: int
-    new: int
+    origin: Word
+    new: Word
     reason: str
 
-PENDING = Change(origin=-1, new=-1, reason="pending")
+PENDING = Change(origin=to_word(-1), new=to_word(-1), reason="pending")
 
 @dataclass
 class Packet:
@@ -92,7 +94,7 @@ class Instruction(ABC):
 
     def remaining(self, stage: Stage) -> int:
         _r = self._tnew - stage
-        return _r if _r > 0 else 0
+        return max(0, _r)
     
     @property
     def opcode(self) -> int: return (self.raw >> 26) & 0x3F
@@ -127,9 +129,9 @@ class Instruction(ABC):
     def get_wreg(self) -> Optional[int]: pass
 
     @abstractmethod
-    def disassemble(self) -> str: pass
+    def disassemble(self, pc: int = None) -> str: pass
 
     # Must be implemented  
     @abstractmethod
-    def execute(self, packet: Packet) -> Optional[List[Behavior]]:
+    def execute(self, packet: Packet):
         pass

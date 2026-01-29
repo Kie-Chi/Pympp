@@ -2,6 +2,7 @@ from struct import pack
 from typing import Optional
 from .isa import instr, Instruction, Packet, Change
 from ..base import Stage
+from ..util.type import to_word, hex32
 
 # [
 #   add
@@ -21,7 +22,7 @@ class Add(Instruction):
     def get_wreg(self) -> Optional[int]:
         return self.rd
     
-    def disassemble(self) -> str:
+    def disassemble(self, pc: int = None) -> str:
         return f"add ${self.rd}, ${self.rs}, ${self.rt}"
 
     def execute(self, packet: Packet):
@@ -29,15 +30,14 @@ class Add(Instruction):
             return
         rs_val = packet.pool.read_reg(self.rs, packet.stage)
         rt_val = packet.pool.read_reg(self.rt, packet.stage)
-        result = rs_val + rt_val
-        packet.pool.write_reg(packet, self.rd, result, "add")
+        packet.pool.write_reg(packet, self.rd, rs_val + rt_val, "add")
 
 @instr(opcode=0, funct=0b100010, tuse_rs=Stage.EX, tuse_rt=Stage.EX, tnew=Stage.MEM)
 class Sub(Instruction):
     def get_wreg(self) -> Optional[int]:
         return self.rd
     
-    def disassemble(self) -> str:
+    def disassemble(self, pc: int = None) -> str:
         return f"sub ${self.rd}, ${self.rs}, ${self.rt}"
 
     def execute(self, packet: Packet):
@@ -45,15 +45,14 @@ class Sub(Instruction):
             return
         rs_val = packet.pool.read_reg(self.rs, packet.stage)
         rt_val = packet.pool.read_reg(self.rt, packet.stage)
-        result = rs_val - rt_val
-        packet.pool.write_reg(packet, self.rd, result, "sub")
+        packet.pool.write_reg(packet, self.rd, rs_val - rt_val, "sub")
 
 @instr(opcode=0b001111, tnew=Stage.MEM)
 class Lui(Instruction):
     def get_wreg(self) -> Optional[int]:
         return self.rt
 
-    def disassemble(self) -> str:
+    def disassemble(self, pc: int = None) -> str:
         return f"lui ${self.rt}, {hex(self.imm16)}"
 
     def execute(self, packet: Packet):
@@ -62,12 +61,12 @@ class Lui(Instruction):
         result = self.imm16 << 16
         packet.pool.write_reg(packet, self.rt, result, "lui")
 
-@instr(opcode=0b001101, tuse_rs=Stage.EX, tnew=Stage.EX)
+@instr(opcode=0b001101, tuse_rs=Stage.EX, tnew=Stage.MEM)
 class Ori(Instruction):
     def get_wreg(self) -> Optional[int]:
         return self.rt
     
-    def disassemble(self) -> str:
+    def disassemble(self, pc: int = None) -> str:
         return f"ori ${self.rt}, ${self.rs}, {hex(self.imm16)}"
 
     def execute(self, packet: Packet):
@@ -83,13 +82,13 @@ class Lw(Instruction):
     def get_wreg(self) -> Optional[int]:
         return self.rt
 
-    def disassemble(self) -> str:
+    def disassemble(self, pc: int = None) -> str:
         return f"lw ${self.rt}, {self.imm16_signed}(${self.rs})"
 
     def execute(self, packet: Packet):
         if packet.stage == Stage.EX:
             rs_val = packet.pool.read_reg(self.rs, packet.stage)
-            addr = rs_val + self.imm16_signed
+            addr = rs_val.value + self.imm16_signed
             packet.optional["mem_addr"] = addr 
         
         elif packet.stage == Stage.MEM:
@@ -101,19 +100,19 @@ class Sw(Instruction):
     def get_wreg(self) -> Optional[int]:
         return None
 
-    def disassemble(self) -> str:
+    def disassemble(self, pc: int = None) -> str:
         return f"sw ${self.rt}, {self.imm16_signed}(${self.rs})"
 
     def execute(self, packet: Packet):
         if packet.stage == Stage.EX:
             rs_val = packet.pool.read_reg(self.rs, packet.stage)
-            addr = rs_val + self.imm16_signed
+            addr = rs_val.value + self.imm16_signed
             packet.optional["mem_addr"] = addr
         
         elif packet.stage == Stage.MEM:
             addr = packet.optional["mem_addr"]
             rt_val = packet.pool.read_reg(self.rt, packet.stage)
-            packet.pool.write_mem(addr, rt_val)
+            packet.pool.write_mem(packet, addr, rt_val)
 
 
 @instr(opcode=0b000100, tuse_rs=Stage.ID, tuse_rt=Stage.ID)
@@ -121,7 +120,7 @@ class Beq(Instruction):
     def get_wreg(self) -> Optional[int]:
         return None
 
-    def disassemble(self) -> str:
+    def disassemble(self, pc: int = None) -> str:
         return f"beq ${self.rs}, ${self.rt}, {self.imm16_signed}"
 
     def execute(self, packet: Packet):
@@ -137,7 +136,7 @@ class Jr(Instruction):
     def get_wreg(self) -> Optional[int]:
         return None
 
-    def disassemble(self) -> str:
+    def disassemble(self, pc: int = None) -> str:
         return f"jr ${self.rs}"
 
     def execute(self, packet: Packet):
@@ -145,30 +144,32 @@ class Jr(Instruction):
             return
         
         rs_val = packet.pool.read_reg(self.rs, packet.stage)
-        packet.npc = rs_val
+        packet.npc = rs_val.value
 
 @instr(opcode=0b000011, tnew=Stage.EX)
 class Jal(Instruction):
     def get_wreg(self) -> Optional[int]:
         return 31 # $ra register
 
-    def disassemble(self) -> str:
-        target_addr = (self.imm26 << 2) | ((self.pc + 4) & 0xF0000000)
-        return f"jal {hex(target_addr)}"
+    def disassemble(self, pc: int = None) -> str:
+        if pc is not None:
+            target_addr = (self.imm26 << 2) | ((pc + 4) & 0xF0000000)
+            return f"jal {hex32(target_addr)}"
+        return f"jal {hex32(self.imm26)}"
 
     def execute(self, packet: Packet):
         if packet.stage == Stage.ID:
             target_addr = (self.imm26 << 2) | ((packet.pc + 4) & 0xF0000000)
             packet.npc = target_addr
             return_addr = packet.pc + 8
-            packet.pool.write_reg(packet, 31, return_addr, "jal")
+            packet.pool.write_reg(packet, 31, to_word(return_addr), "jal")
 
 @instr(opcode=0, funct=0) # Nop is usually all zeros
 class Nop(Instruction):
     def get_wreg(self) -> Optional[int]:
         return None
     
-    def disassemble(self) -> str:
+    def disassemble(self, pc: int = None) -> str:
         return "nop"
 
     def execute(self, packet: Packet):

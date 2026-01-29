@@ -1,7 +1,9 @@
+from audioop import add
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass, asdict
-from .base import Stage, StallException
-from .behaviors import StageStatus, RegWriteBehavior,MemWriteBehavior, BranchBehavior, StallBehavior
+from .base import Stage, StallException, Word, Byte, Half
+from .util.type import to_word, to_byte, to_half, hex32
+from .behaviors import Behavior, StageStatus, RegWriteBehavior,MemWriteBehavior, BranchBehavior, StallBehavior
 from .pipeline import Pool
 from .mips.isa import Instruction, Packet, decode
 
@@ -22,12 +24,12 @@ class Snapshot:
 class RegisterFile:
     def __init__(self, cpu):
         self.cpu = cpu
-        self.regs = [0] * 32
+        self.regs = [Word(0) for _ in range(32)]
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: int) -> Word:
         return self.regs[key]
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: int, value: Word):
         self.regs[key] = value
 
     def __iter__(self):
@@ -36,23 +38,24 @@ class RegisterFile:
     def copy(self):
         return self.regs.copy()
 
-    def read(self, reg_id):
+    def read(self, reg_id: int) -> Word:
         val = self.regs[reg_id]
         return val
 
-    def write(self, reg_id, value, pc):
+    def write(self, reg_id: int, value, pc: int):
+        data = Word(value)
         if reg_id != 0:
-            self.regs[reg_id] = value
-            self.cpu.log_behavior(RegWriteBehavior(self.cpu.cycle, pc, reg_id, value))
+            self.regs[reg_id] = data
+            self.cpu.log_behavior(RegWriteBehavior(self.cpu.cycle, pc, reg_id, data.value))
 
 class Memory:
     def __init__(self, cpu):
         self.cpu = cpu
-        self.data = {}
+        self.data: Dict[int, Word] = {}
 
-    def read(self, addr):
-        val = self.data.get(addr, 0)
-        return val
+    def read(self, addr: int) -> Word:
+        val = self.data.get(int(addr), 0)
+        return to_word(val)
     
     def get(self, addr, default=0):
         return self.data.get(addr, default)
@@ -60,22 +63,24 @@ class Memory:
     def copy(self):
         return self.data.copy()
 
-    def write(self, addr, value, pc):
-        self.data[addr] = value
-        self.cpu.log_behavior(MemWriteBehavior(self.cpu.cycle, pc, addr, value))
+    def write(self, addr: int, value, pc: int):
+        data = Word(value)
+        iaddr = int(addr)
+        self.data[iaddr] = data
+        self.cpu.log_behavior(MemWriteBehavior(self.cpu.cycle, pc, iaddr, data.value))
 
 class CPU:
     def __init__(self, machine_codes: List[int]):
         self.pc = 0x3000
-        self.regs = RegisterFile(self)
+        self.regs: RegisterFile = RegisterFile(self)
         self.imem = machine_codes
-        self.dmem = Memory(self)
+        self.dmem: Memory = Memory(self)
         self.cycle = 0
         self.slots: Dict[Stage, Optional[Packet]] = {s: None for s in Stage}
-        self.pool = Pool(self)
+        self.pool: Pool = Pool(self)
         
-        self.current_behaviors = []
-        self.history = []
+        self.current_behaviors: List[Behavior] = []
+        self.history: List[Snapshot] = []
 
     def log_behavior(self, b):
         self.current_behaviors.append(b)
@@ -162,16 +167,16 @@ class CPU:
                 pipeline_snap[s.name] = StageStatus(
                     cycle=self.cycle, pc=p.pc, stage=s.name,
                     instr_name=p.instr.__class__.__name__.lower(),
-                    disasm=p.instr.disassemble(),
+                    disasm=p.instr.disassemble(p.pc),
                     t_new=p.instr.remaining(s)
                 ).to_dict()
             else:
                 pipeline_snap[s.name] = None
         self.history.append({
             "cycle": self.cycle,
-            "pc": self.pc,
-            "gpr": self.regs.copy(),
-            "memory": self.dmem.copy(),
+            "pc": hex32(self.pc),
+            "gpr": [hex32(r.value) for r in self.regs],
+            "memory": {hex32(addr): hex32(val.value) for addr, val in self.dmem.copy().items()},
             "pipeline": pipeline_snap,
             "behaviors": self.current_behaviors.copy(),
         })
