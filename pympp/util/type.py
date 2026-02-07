@@ -1,6 +1,4 @@
 from typing import Union
-MASK = 0xFFFFFFFF
-
 from functools import total_ordering
 
 MASK = 0xFFFFFFFF
@@ -90,12 +88,6 @@ def to_word(val: int) -> Word:
 
 def hex32(val: int) -> str:
     return f"{int(val) & MASK:08x}"
-
-def to_word(val: int) -> Word:
-    return Word(val=val)
-
-def hex32(val: int) -> str:
-    return f"{val & MASK:08x}"
 
 Half = int
 Byte = int

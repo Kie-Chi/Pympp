@@ -1,0 +1,13 @@
+*.md
+*.txt
+**/**
+!requirements.txt
+!pymipspipeline
+!pympp
+!pympp/**
+!pyproject.toml
+!README.md
+!.gitignore
+**/__pycache__/**
+**/.mypy_cache/**
+**/__pycache__
