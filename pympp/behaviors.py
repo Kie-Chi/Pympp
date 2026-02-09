@@ -29,16 +29,22 @@ class Behavior:
 @dataclass
 class StageStatus(Behavior):
     """pipeline status"""
-    stage: str
-    instr_name: str
-    disasm: str
-    t_new: int
+    name: str          # IF, ID, etc.
+    instr: str         # "add $1, $2, $3"
+    rs: int = 0
+    rt: int = 0
+    rd: int = 0
+    imm: int = 0
+    tuse_rs: int = -1 # tuse_remaining
+    tuse_rt: int = -1 # tuse_remaining
+    tnew: int = -1 # tnew_remaining
     is_bubble: bool = False
+    is_stall: bool = False
 
     def __str__(self):
         if self.is_bubble:
-            return f"BUBBLE in {self.stage}"
-        return f"{self.stage}: [{self.disasm}] (t_new={self.t_new})"
+            return f"BUBBLE in {self.name}"
+        return f"{self.name}: [{self.instr}] (t_new={self.tnew})"
 
 
 # @dataclass

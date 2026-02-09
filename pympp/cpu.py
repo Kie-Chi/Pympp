@@ -1,11 +1,12 @@
-from audioop import add
+from subprocess import PIPE
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass, asdict
-from .base import Stage, StallException, Word, Byte, Half
+from .base import PIPELINE, Stage, StallException, Word, Byte, Half
 from .util.type import to_word, to_byte, to_half, hex32
-from .behaviors import Behavior, StageStatus, RegWriteBehavior,MemWriteBehavior, BranchBehavior, StallBehavior
+from .behaviors import Behavior, StageStatus, RegWriteBehavior, MemWriteBehavior, BranchBehavior, StallBehavior
 from .pipeline import Pool
 from .mips.isa import Instruction, Packet, decode
+from .mips.set import Bubble 
 
 @dataclass
 class Snapshot:
@@ -77,7 +78,7 @@ class CPU:
         self.dmem: Memory = Memory(self)
         self.cycle = 0
         self.slots: Dict[Stage, Optional[Packet]] = {s: None for s in Stage}
-        self.shadows = None
+        self.shadows: Dict[Stage, Optional[Packet]] = {s: None for s in Stage}
         self.pool: Pool = Pool(self)
         
         self.current_behaviors: List[Behavior] = []
@@ -135,7 +136,12 @@ class CPU:
             return False
 
         except StallException as e:
-            self.slots[Stage.EX] = None
+            bubble_pkt = Packet(
+                pool=self.pool, 
+                pc=0, 
+                instr=Bubble(0) 
+            )
+            self.slots[Stage.EX] = bubble_pkt
             self.log_behavior(StallBehavior(self.cycle, p.pc, "ID", str(e)))
             return True
 
@@ -144,10 +150,10 @@ class CPU:
             return
         
         fetch_pc = self.pc
-        # origin ID instr now in EX stage
-        p_id = self.slots[Stage.ID]
-        if p_id and p_id.npc != p_id.pc + 4:
-            self.pc = p_id.npc
+        p_prev_id = self.slots[Stage.EX]         
+        if p_prev_id and p_prev_id.npc != p_prev_id.pc + 4:
+            self.pc = p_prev_id.npc
+            self.log_behavior(BranchBehavior(self.cycle, p_prev_id.pc, p_prev_id.npc, taken=True))
         else:
             self.pc += 4
 
@@ -156,24 +162,44 @@ class CPU:
             instr_code = self.imem[idx]
             instr = decode(instr_code, fetch_pc)
             self.slots[Stage.ID] = Packet(pool=self.pool, pc=fetch_pc, instr=instr)
-            if p_id and p_id.npc != p_id.pc + 4:
-                self.log_behavior(BranchBehavior(self.cycle, p_id.pc, p_id.npc, taken=True))
         else:
             self.slots[Stage.ID] = None
 
     def capture_snapshot(self):
         pipeline_snap = {}
-        for s in [Stage.IF, Stage.ID, Stage.EX, Stage.MEM, Stage.WB]:
-            p = self.slots[s]
+        s = Stage.IF
+        while s != Stage.END:
+            p = self.shadows[s]
             if p:
+                is_bubble = isinstance(p.instr, Bubble)
+                is_stall = False
+                if s == Stage.ID:
+                    for b in self.current_behaviors:
+                        if isinstance(b, StallBehavior) and b.stage == "ID":
+                            is_stall = True
+                            break
+                tuse_rs = p.instr.tuse_rs_remaining(s)
+                tuse_rt = p.instr.tuse_rt_remaining(s)
+                tnew = p.instr.tnew_remaining(s)
                 pipeline_snap[s.name] = StageStatus(
-                    cycle=self.cycle, pc=p.pc, stage=s.name,
-                    instr_name=p.instr.__class__.__name__.lower(),
-                    disasm=p.instr.disassemble(p.pc),
-                    t_new=p.instr.remaining(s)
+                    cycle=self.cycle,
+                    pc=p.pc,
+                    name=s.name,
+                    instr=p.instr.disassemble(p.pc),
+                    rs=p.instr.rs,
+                    rt=p.instr.rt,
+                    rd=p.instr.rd,
+                    imm=p.instr.imm16,
+                    tuse_rs=tuse_rs,
+                    tuse_rt=tuse_rt,
+                    tnew=tnew,
+                    is_bubble=is_bubble,
+                    is_stall=is_stall
                 ).to_dict()
             else:
                 pipeline_snap[s.name] = None
+            s = PIPELINE[s]
+
         self.history.append({
             "cycle": self.cycle,
             "pc": hex32(self.pc),

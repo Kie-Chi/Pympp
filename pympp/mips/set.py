@@ -175,3 +175,7 @@ class Nop(Instruction):
     def execute(self, packet: Packet):
         # Does absolutely nothing
         pass
+
+class Bubble(Nop):
+    def disassemble(self, pc: int = None) -> str:
+        return "nop(bubble)"

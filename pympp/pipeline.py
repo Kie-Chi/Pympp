@@ -20,7 +20,7 @@ class Pool:
             if not prod_packet: continue
             
             if prod_packet.instr.get_wreg() == reg:
-                t_new = prod_packet.instr.remaining(s)
+                t_new = prod_packet.instr.tnew_remaining(s)
                 t_use_val = max(0, t_use.value - Stage.ID.value)
                 
                 if t_use_val < t_new:
@@ -40,7 +40,7 @@ class Pool:
                 continue
             
             if prod_packet.instr.get_wreg() == reg:
-                t_new = prod_packet.instr.remaining(s)
+                t_new = prod_packet.instr.tnew_remaining(s)
                 
                 # Double check stall for safety
                 if cur_stage == Stage.ID:

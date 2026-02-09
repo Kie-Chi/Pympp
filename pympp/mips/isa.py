@@ -92,7 +92,15 @@ class Instruction(ABC):
     @property
     def tnew(self) -> Stage: return self._tnew
 
-    def remaining(self, stage: Stage) -> int:
+    def tuse_rs_remaining(self, stage: Stage) -> int:
+        _r = self._tuse_rs - stage
+        return max(0, _r)
+    
+    def tuse_rt_remaining(self, stage: Stage) -> int:
+        _r = self._tuse_rt - stage
+        return max(0, _r)
+
+    def tnew_remaining(self, stage: Stage) -> int:
         _r = self._tnew - stage
         return max(0, _r)
     
