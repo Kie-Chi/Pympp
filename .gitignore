@@ -5,6 +5,8 @@
 !pymipspipeline
 !pympp
 !pympp/**
+!doc
+!doc/**
 !pyproject.toml
 !README.md
 !.gitignore
