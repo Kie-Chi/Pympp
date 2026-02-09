@@ -1,0 +1,206 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import List, Dict, Any, Optional
+from ..cpu import CPU
+from .assembler import assemble
+from ..util.type import hex32
+from ..base import Stage
+from .schema import (
+    LoadResponse, ResetResponse, CycleInfo, MemoryPageResponse,
+    SnapshotSchema, PipelineStageSchema, RegisterSchema, 
+    EventsSchema, ForwardingSchema
+)
+
+app = FastAPI(title="MIPS Pipeline Simulator API v2.0")
+
+# Register name mapping
+REG_NAMES = [
+    "$zero", "$at", "$v0", "$v1", "$a0", "$a1", "$a2", "$a3",
+    "$t0", "$t1", "$t2", "$t3", "$t4", "$t5", "$t6", "$t7",
+    "$s0", "$s1", "$s2", "$s3", "$s4", "$s5", "$s6", "$s7",
+    "$t8", "$t9", "$k0", "$k1", "$gp", "$sp", "$fp", "$ra"
+]
+
+class Simulator:
+    def __init__(self):
+        self.cpu: Optional[CPU] = None
+        self.source_map: Dict[str, int] = {}
+        self.asm_source: str = ""
+
+    def load(self, asm_source: str):
+        self.asm_source = asm_source
+        machine_codes, source_map = assemble(asm_source)
+        self.cpu = CPU(machine_codes)
+        self.source_map = source_map
+        return True
+
+    def ensure_cpu(self):
+        if not self.cpu:
+            raise HTTPException(status_code=400, detail="Program not loaded")
+
+manager = Simulator()
+
+class LoadRequest(BaseModel):
+    asm_source: str
+
+def _to_snapshot_schema(snap: Dict[str, Any]) -> SnapshotSchema:
+    pipeline_data = {}
+    for stage_name, stage_info in snap["pipeline"].items():
+        if stage_info:
+            pipeline_data[stage_name] = PipelineStageSchema(
+                pc=hex32(stage_info["pc"]),
+                instr=stage_info["instr"],
+                is_bubble=stage_info["is_bubble"],
+                is_stall=stage_info["is_stall"]
+            )
+        else:
+            pipeline_data[stage_name] = None
+
+    registers_data = {}
+    for i, val in enumerate(snap["gpr"]):
+        registers_data[str(i)] = RegisterSchema(
+            name=REG_NAMES[i],
+            value=val
+        )
+
+    memory_data = snap["memory"]
+    behaviors = snap["behaviors"]
+    regs_written = []
+    mem_written = []
+    forwarding = []
+
+    for b in behaviors:
+        b_type = b.__class__.__name__ if not isinstance(b, dict) else b.get("type")
+        
+        if b_type == "RegWriteBehavior":
+            reg = getattr(b, "reg", None)
+            if reg is None and isinstance(b, dict): reg = b.get("reg")
+            regs_written.append(reg)
+        elif b_type == "MemWriteBehavior":
+            addr = getattr(b, "addr", None)
+            if addr is None and isinstance(b, dict): addr = b.get("addr")
+            mem_written.append(hex32(addr))
+        elif b_type == "ForwardBehavior":
+            from_stage = getattr(b, "from_stage", None)
+            if from_stage is None and isinstance(b, dict): from_stage = b.get("from_stage")
+            
+            to_stage = getattr(b, "to_stage", None)
+            if to_stage is None and isinstance(b, dict): to_stage = b.get("to_stage")
+            
+            reg = getattr(b, "reg", None)
+            if reg is None and isinstance(b, dict): reg = b.get("reg")
+
+            forwarding.append(ForwardingSchema(
+                from_stage=from_stage,
+                to_stage=to_stage,
+                reg=reg
+            ))
+
+    events_data = EventsSchema(
+        registers_written=regs_written,
+        memory_written=mem_written,
+        forwarding=forwarding
+    )
+
+    return SnapshotSchema(
+        cycle=snap["cycle"],
+        pc=snap["pc"],
+        pipeline=pipeline_data,
+        registers=registers_data,
+        memory=memory_data,
+        events=events_data
+    )
+
+@app.post("/load_program", response_model=LoadResponse)
+def load_program(req: LoadRequest):
+    try:
+        manager.load(req.asm_source)
+        return LoadResponse(success=True, message="Program loaded and simulator reset.")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/get_source_map")
+def get_source_map():
+    manager.ensure_cpu()
+    return manager.source_map
+
+@app.post("/step_cycle", response_model=SnapshotSchema)
+def step_cycle():
+    manager.ensure_cpu()
+    manager.cpu.step()
+    return _to_snapshot_schema(manager.cpu.history[-1])
+
+@app.post("/run_until_end", response_model=List[SnapshotSchema])
+def run_until_end(max_cycles: int = 1000):
+    manager.ensure_cpu()
+    
+    # Run loop
+    for _ in range(max_cycles):
+        idx = (manager.cpu.pc - 0x3000) // 4
+        pc_out_of_bounds = not (0 <= idx < len(manager.cpu.imem))
+        
+        pipeline_empty = True
+        for s in manager.cpu.slots.values():
+            if s is not None:
+                pipeline_empty = False
+                break
+        
+        if pc_out_of_bounds and pipeline_empty:
+            break
+            
+        manager.cpu.step()
+        
+    return [_to_snapshot_schema(snap) for snap in manager.cpu.history]
+
+@app.post("/reset", response_model=ResetResponse)
+def reset():
+    if manager.asm_source:
+        manager.load(manager.asm_source)
+    else:
+        raise HTTPException(status_code=400, detail="No program to reset")
+    return ResetResponse(success=True, message="Simulator reset with the current program.")
+
+@app.get("/get_snapshot/{cycle}", response_model=SnapshotSchema)
+def get_snapshot(cycle: int):
+    manager.ensure_cpu()
+    if 0 <= cycle < len(manager.cpu.history):
+        return _to_snapshot_schema(manager.cpu.history[cycle])
+    raise HTTPException(status_code=404, detail="Cycle not found")
+
+@app.get("/get_current_cycle", response_model=CycleInfo)
+def get_current_cycle():
+    manager.ensure_cpu()
+    return CycleInfo(cycle=manager.cpu.cycle)
+
+@app.get("/find_cycle_by_pc/{pc}", response_model=Dict[str, Optional[int]])
+def find_cycle_by_pc(pc: str):
+    """
+    Finds the first cycle where the instruction at the given PC entered the IF stage.
+    """
+    manager.ensure_cpu()
+    target_pc_val = int(pc, 16)
+    for i, snap in enumerate(manager.cpu.history):
+        if_stage = snap["pipeline"].get("IF")
+        if if_stage and if_stage["pc"] == target_pc_val:
+            return {"cycle": snap["cycle"]}
+    return {"cycle": None}
+
+@app.get("/get_memory_page", response_model=MemoryPageResponse)
+def get_memory_page(start_addr: str, lines: int = 16):
+    """
+    Returns a list of memory values starting from start_addr.
+    """
+    manager.ensure_cpu()
+    
+    start_val = int(start_addr, 16)
+    values = []
+    
+    for i in range(lines):
+        addr = start_val + (i * 4)
+        val_word = manager.cpu.dmem.read(addr)
+        values.append(hex32(val_word.value))
+        
+    return MemoryPageResponse(
+        start_addr=hex32(start_val),
+        values=values
+    )
