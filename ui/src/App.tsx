@@ -8,6 +8,7 @@ import PipelineVisualizer from './components/PipelineVisualizer';
 import RegisterFile from './components/RegisterFile';
 import MemoryView from './components/MemoryView';
 import ConfigPanel from './components/ConfigPanel';
+import { HelpCircle } from 'lucide-react';
 
 const DEFAULT_ASM = `# Bubble Sort Implementation
 # Initialize array in memory
@@ -281,6 +282,24 @@ function App() {
             <h1 className="text-xl font-bold text-slate-800 tracking-tight">
                 MIPS Pipeline Simulator
             </h1>
+            <div className="relative group ml-2">
+                <div className="cursor-help p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+                    <HelpCircle size={18} />
+                </div>
+                {/* Shortcuts Tooltip */}
+                <div className="absolute left-full top-0 ml-3 w-48 bg-slate-800 text-white text-xs rounded-lg py-2 px-3 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none transform translate-y-[-10%]">
+                    <div className="font-semibold mb-1 border-b border-slate-600 pb-1">Shortcuts</div>
+                    <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1">
+                        <span>Assemble / Load</span> <span className="font-mono text-slate-300">F6</span>
+                        <span>Run / Continue</span> <span className="font-mono text-slate-300">F5</span>
+                        <span>Step Forward</span> <span className="font-mono text-slate-300">F10</span>
+                        <span>Step Back</span> <span className="font-mono text-slate-300">F11</span>
+                        <span>Stop</span> <span className="font-mono text-slate-300">Esc</span>
+                    </div>
+                    {/* Arrow */}
+                    <div className="absolute right-full top-4 -mr-1 border-4 border-transparent border-r-slate-800"></div>
+                </div>
+            </div>
         </div>
         {error && (
             <div className="text-red-600 text-sm font-medium bg-red-50 px-4 py-1.5 rounded-full border border-red-200 animate-pulse shadow-sm flex items-center gap-2">
