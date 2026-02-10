@@ -64,7 +64,7 @@ manager = Simulator()
 class LoadRequest(BaseModel):
     asm_source: str
 
-def _to_snapshot_schema(snap: Dict[str, Any]) -> SnapshotSchema:
+def _to_snapshot_schema(snap: Dict[str, Any], outofbound: bool = False) -> SnapshotSchema:
     pipeline_data = {}
     for stage_name, stage_info in snap["pipeline"].items():
         if stage_info:
@@ -124,6 +124,7 @@ def _to_snapshot_schema(snap: Dict[str, Any]) -> SnapshotSchema:
     )
 
     return SnapshotSchema(
+        outofbound=outofbound,
         cycle=snap["cycle"],
         pc=snap["pc"],
         pipeline=pipeline_data,
@@ -242,11 +243,11 @@ def get_snapshot(cycle: int):
     # If simulation finished or stopped before reaching cycle
     if manager.cpu.history:
         if manager.is_finished():
-             manager.display_cycle = manager.cpu.history[-1]["cycle"]
-             return _to_snapshot_schema(manager.cpu.history[-1])
+            manager.display_cycle = manager.cpu.history[-1]["cycle"]
+            return _to_snapshot_schema(manager.cpu.history[-1], outofbound=True)
         else:
-             manager.display_cycle = manager.cpu.history[-1]["cycle"]
-             return _to_snapshot_schema(manager.cpu.history[-1])
+            manager.display_cycle = manager.cpu.history[-1]["cycle"]
+            return _to_snapshot_schema(manager.cpu.history[-1])
 
     raise HTTPException(status_code=404, detail="Simulation finished")
 

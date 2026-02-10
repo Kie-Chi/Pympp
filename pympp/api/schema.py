@@ -22,6 +22,7 @@ class EventsSchema(BaseModel):
     forwarding: List[ForwardingSchema]
 
 class SnapshotSchema(BaseModel):
+    outofbound: bool = False # if the cursor out of cycle bounds
     cycle: int
     pc: str
     pipeline: Dict[str, Optional[PipelineStageSchema]]
