@@ -8,7 +8,8 @@ import PipelineVisualizer from './components/PipelineVisualizer';
 import RegisterFile from './components/RegisterFile';
 import MemoryView from './components/MemoryView';
 import ConfigPanel from './components/ConfigPanel';
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, BookOpen } from 'lucide-react';
+import InstructionReference from './components/InstructionReference';
 
 const DEFAULT_ASM = `# Bubble Sort Implementation
 # Initialize array in memory
@@ -82,6 +83,7 @@ function App() {
   const [sourceMap, setSourceMap] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [isAssembled, setIsAssembled] = useState(false);
+  const [showInstrRef, setShowInstrRef] = useState(false);
 
   const refreshState = useCallback(async (snap?: Snapshot) => {
     try {
@@ -300,6 +302,16 @@ function App() {
                     <div className="absolute right-full top-4 -mr-1 border-4 border-transparent border-r-slate-800"></div>
                 </div>
             </div>
+
+            <div className="relative group ml-1">
+                <button 
+                    onClick={() => setShowInstrRef(true)}
+                    className="cursor-pointer p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+                    title="Instruction Reference"
+                >
+                    <BookOpen size={18} />
+                </button>
+            </div>
         </div>
         {error && (
             <div className="text-red-600 text-sm font-medium bg-red-50 px-4 py-1.5 rounded-full border border-red-200 animate-pulse shadow-sm flex items-center gap-2">
@@ -368,6 +380,9 @@ function App() {
       
       {/* Configuration Panel */}
       <ConfigPanel />
+      
+      {/* Instruction Reference Modal */}
+      <InstructionReference isOpen={showInstrRef} onClose={() => setShowInstrRef(false)} />
     </div>
   );
 }
