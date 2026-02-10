@@ -1,0 +1,74 @@
+[
+  {
+    "name": "add",
+    "syntax": "add $d, $s, $t",
+    "description": "Add Word",
+    "tuse_rs": [1],
+    "tuse_rt": [1],
+    "tnew": [2]
+  },
+  {
+    "name": "sub",
+    "syntax": "sub $d, $s, $t",
+    "description": "Subtract Word",
+    "tuse_rs": [1],
+    "tuse_rt": [1],
+    "tnew": [2]
+  },
+  {
+    "name": "ori",
+    "syntax": "ori $t, $s, imm",
+    "description": "Or Immediate",
+    "tuse_rs": [1],
+    "tuse_rt": [null],
+    "tnew": [2]
+  },
+  {
+    "name": "lw",
+    "syntax": "lw $t, offset($s)",
+    "description": "Load Word",
+    "tuse_rs": [1],
+    "tuse_rt": [null],
+    "tnew": [3]
+  },
+  {
+    "name": "sw",
+    "syntax": "sw $t, offset($s)",
+    "description": "Store Word",
+    "tuse_rs": [1],
+    "tuse_rt": [2],
+    "tnew": [null]
+  },
+  {
+    "name": "beq",
+    "syntax": "beq $s, $t, label",
+    "description": "Branch on Equal",
+    "tuse_rs": [0],
+    "tuse_rt": [0],
+    "tnew": [null]
+  },
+  {
+    "name": "jal",
+    "syntax": "jal label",
+    "description": "Jump and Link",
+    "tuse_rs": [null],
+    "tuse_rt": [null],
+    "tnew": [1, 2]
+  },
+  {
+    "name": "jr",
+    "syntax": "jr $s",
+    "description": "Jump Register",
+    "tuse_rs": [0],
+    "tuse_rt": [null],
+    "tnew": [null]
+  },
+  {
+    "name": "jalx",
+    "syntax": "jalx rs, rt, offset",
+    "description": "descriptions/jalx.md",
+    "tuse_rs": [0],
+    "tuse_rt": [0],
+    "tnew": [1, 2]
+  }
+]

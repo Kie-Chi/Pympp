@@ -8,8 +8,9 @@ import PipelineVisualizer from './components/PipelineVisualizer';
 import RegisterFile from './components/RegisterFile';
 import MemoryView from './components/MemoryView';
 import ConfigPanel from './components/ConfigPanel';
-import { HelpCircle, BookOpen } from 'lucide-react';
+import { HelpCircle, BookOpen, GraduationCap } from 'lucide-react';
 import InstructionReference from './components/InstructionReference';
+import QuizMode from './components/QuizMode';
 
 const DEFAULT_ASM = `# Bubble Sort Implementation
 # Initialize array in memory
@@ -84,6 +85,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [isAssembled, setIsAssembled] = useState(false);
   const [showInstrRef, setShowInstrRef] = useState(false);
+  const [showQuiz, setShowQuiz] = useState(false);
 
   const refreshState = useCallback(async (snap?: Snapshot) => {
     try {
@@ -312,6 +314,15 @@ function App() {
                     <BookOpen size={18} />
                 </button>
             </div>
+            <div className="relative group ml-1">
+                <button 
+                    onClick={() => setShowQuiz(true)}
+                    className="cursor-pointer p-1 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-full transition-colors"
+                    title="Quiz Mode"
+                >
+                    <GraduationCap size={18} />
+                </button>
+            </div>
         </div>
         {error && (
             <div className="text-red-600 text-sm font-medium bg-red-50 px-4 py-1.5 rounded-full border border-red-200 animate-pulse shadow-sm flex items-center gap-2">
@@ -383,6 +394,9 @@ function App() {
       
       {/* Instruction Reference Modal */}
       <InstructionReference isOpen={showInstrRef} onClose={() => setShowInstrRef(false)} />
+
+      {/* Quiz Mode Modal */}
+      <QuizMode isOpen={showQuiz} onClose={() => setShowQuiz(false)} />
     </div>
   );
 }

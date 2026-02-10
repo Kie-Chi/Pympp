@@ -1,3 +1,105 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Quiz description content styles */
+.quiz-description-content {
+  @apply text-slate-700 text-sm;
+}
+
+.quiz-description-content h1 {
+  @apply text-2xl font-bold mb-4 text-slate-800;
+}
+
+.quiz-description-content h2 {
+  @apply text-xl font-bold mb-3 text-slate-800;
+}
+
+.quiz-description-content h3 {
+  @apply text-lg font-semibold mb-2 text-slate-800;
+}
+
+.quiz-description-content p {
+  @apply mb-2 leading-relaxed;
+}
+
+.quiz-description-content table {
+  @apply w-full my-4;
+  border-collapse: collapse;
+  border: 2px solid #64748b;
+}
+
+.quiz-description-content table td,
+.quiz-description-content table th {
+  border: 1px solid #94a3b8;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.quiz-description-content table th {
+  @apply bg-slate-200 font-semibold text-slate-800;
+}
+
+.quiz-description-content table tr:nth-child(even) {
+  @apply bg-slate-50;
+}
+
+.quiz-description-content #td-head {
+  @apply bg-slate-200 font-bold;
+  min-width: 80px;
+}
+
+.quiz-description-content #td-opcode-top,
+.quiz-description-content #td-rs-top,
+.quiz-description-content #td-rt-top,
+.quiz-description-content #td-imm-top {
+  @apply bg-slate-100 text-xs text-slate-600;
+  position: relative;
+}
+
+.quiz-description-content #td-opcode,
+.quiz-description-content #td-rs,
+.quiz-description-content #td-rt,
+.quiz-description-content #td-imm {
+  @apply bg-white font-mono;
+}
+
+.quiz-description-content #td-opcode-bottom,
+.quiz-description-content #td-rs-bottom,
+.quiz-description-content #td-rt-bottom,
+.quiz-description-content #td-imm-bottom {
+  @apply bg-slate-100 text-xs text-slate-600 font-semibold;
+}
+
+.quiz-description-content #p-code {
+  @apply font-mono text-sm mb-1;
+}
+
+.quiz-description-content #p-text {
+  @apply text-sm mb-2 leading-relaxed;
+}
+
+.quiz-description-content code {
+  @apply bg-slate-100 px-1 py-0.5 rounded text-xs font-mono;
+}
+
+.quiz-description-content pre {
+  @apply bg-slate-100 p-3 rounded overflow-x-auto mb-3 font-mono text-sm;
+}
+
+.quiz-description-content ul {
+  @apply list-disc list-inside mb-3;
+}
+
+.quiz-description-content ol {
+  @apply list-decimal list-inside mb-3;
+}
+
+.quiz-description-content sup {
+  @apply text-xs align-super;
+}
+
+.quiz-description-content sub {
+  @apply text-xs align-sub;
+}
+
