@@ -31,6 +31,8 @@ def assemble_with_mars(asm_source: str) -> List[int]:
             "java",
             "-jar",
             MARS_JAR_PATH,
+            "mc",
+            "LargeText",
             "a",            # Assemble only
             "dump",         # Dump memory contents
             ".text",        # The text segment

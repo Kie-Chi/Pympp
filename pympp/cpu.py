@@ -137,7 +137,7 @@ class CPU:
                     p_id.advance()
                 p_id.instr.execute(p_id)
                 if p_id.npc != p_id.pc + 4:
-                    self.pc = p_id.npc
+                    self.pc = p_id.npc - 4 # IF will add 4
                     self.log_behavior(BranchBehavior(self.cycle, p_id.pc, p_id.npc, taken=True))
                 self.slots[Stage.EX] = p_id
                 self.slots[Stage.ID] = None
