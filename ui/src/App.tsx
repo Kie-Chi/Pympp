@@ -290,6 +290,7 @@ function App() {
                     memory={snapshot?.memory} 
                     cycle={snapshot?.cycle || 0} 
                     writtenAddresses={snapshot?.events?.memory_written}
+                    memoryChanges={snapshot?.events?.memory_changes}
                 />
             </div>
           </div>
@@ -299,6 +300,7 @@ function App() {
             <RegisterFile 
                 registers={snapshot?.registers} 
                 writtenRegisters={snapshot?.events?.registers_written}
+                registerChanges={snapshot?.events?.register_changes}
             />
           </div>
 

@@ -124,6 +124,12 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ className = '' }) => {
                 </span>
               </div>
               <div className="flex justify-between">
+                <span>Change Animation:</span>
+                <span className={appConfig.ui.enableChangeVisualization ? 'text-green-600' : 'text-red-600'}>
+                  {appConfig.ui.enableChangeVisualization ? '✓ Enabled' : '✗ Disabled'}
+                </span>
+              </div>
+              <div className="flex justify-between">
                 <span>PC Input:</span>
                 <span className={appConfig.debug.showPCInput ? 'text-green-600' : 'text-red-600'}>
                   {appConfig.debug.showPCInput ? '✓ Shown' : '✗ Hidden'}

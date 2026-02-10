@@ -1,6 +1,11 @@
 from typing import List, Dict, Optional, Any
 from pydantic import BaseModel
 
+class ChangeSchema(BaseModel):
+    origin: str
+    new: str
+    reason: str
+
 class PipelineStageSchema(BaseModel):
     pc: str
     instr: str
@@ -20,6 +25,8 @@ class EventsSchema(BaseModel):
     registers_written: List[int]
     memory_written: List[str]
     forwarding: List[ForwardingSchema]
+    register_changes: Optional[Dict[str, ChangeSchema]] = None
+    memory_changes: Optional[Dict[str, ChangeSchema]] = None
 
 class SnapshotSchema(BaseModel):
     outofbound: bool = False # if the cursor out of cycle bounds

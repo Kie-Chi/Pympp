@@ -1,9 +1,11 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Register } from '../types/schema';
+import { appConfig } from '../config';
 
 interface Props {
   registers: Record<string, Register> | undefined;
   writtenRegisters?: number[];
+  registerChanges?: Record<string, { origin: string; new: string; reason: string }>;
 }
 
 const REG_NAMES = [
@@ -13,8 +15,9 @@ const REG_NAMES = [
     "$t8", "$t9", "$k0", "$k1", "$gp", "$sp", "$fp", "$ra"
 ];
 
-const RegisterFile: React.FC<Props> = ({ registers, writtenRegisters = [] }) => {
+const RegisterFile: React.FC<Props> = ({ registers, writtenRegisters = [], registerChanges = {} }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [animatingRegisters, setAnimatingRegisters] = useState<Set<number>>(new Set());
   
   // Auto-scroll logic... (keep existing)
   useEffect(() => {
@@ -26,6 +29,21 @@ const RegisterFile: React.FC<Props> = ({ registers, writtenRegisters = [] }) => 
         }
     }
   }, [writtenRegisters]);
+
+  // Handle change animation
+  useEffect(() => {
+    if (appConfig.ui.enableChangeVisualization && Object.keys(registerChanges).length > 0) {
+      const changedRegIds = Object.keys(registerChanges).map(Number);
+      setAnimatingRegisters(new Set(changedRegIds));
+      
+      // Clear animation after 2 seconds
+      const timer = setTimeout(() => {
+        setAnimatingRegisters(new Set());
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [registerChanges]);
 
   // Generate display list
   const displayRegisters = React.useMemo(() => {
@@ -57,14 +75,18 @@ const RegisterFile: React.FC<Props> = ({ registers, writtenRegisters = [] }) => 
         <table className="w-full text-[10px] text-left border-collapse table-fixed">
             <thead className="bg-slate-50 text-slate-500 font-medium sticky top-0 z-10 shadow-sm">
                 <tr>
-                <th className="px-2 py-1 border-b border-gray-200 w-[15%]">Name</th>
+                <th className="px-2 py-1 border-b border-gray-200 w-[20%]">Name</th>
                 <th className="px-2 py-1 border-b border-gray-200 w-[10%]">#</th>
-                <th className="px-2 py-1 border-b border-gray-200 text-right w-auto">Value</th>
+                <th className="px-2 py-1 border-b border-gray-200 text-right w-[70%]">Value</th>
                 </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
                 {displayRegisters.map((reg, idx) => {
                     const isWritten = writtenRegisters.includes(reg.id);
+                    const isAnimating = animatingRegisters.has(reg.id);
+                    const change = registerChanges[reg.id];
+                    const showChange = appConfig.ui.enableChangeVisualization && change;
+                    
                     return (
                         <tr 
                             key={reg.id} 
@@ -81,7 +103,21 @@ const RegisterFile: React.FC<Props> = ({ registers, writtenRegisters = [] }) => 
                             </td>
                             <td className="px-2 py-0.5 text-slate-400 font-mono">${reg.id}</td>
                             <td className={`px-2 py-0.5 font-mono text-right ${isWritten ? 'font-bold text-red-700' : 'text-slate-700'}`}>
-                                {reg.value}
+                                {showChange && isAnimating ? (
+                                  <div className="flex flex-row items-center justify-end gap-1">
+                                    <div className="text-slate-400 line-through text-[9px] transition-opacity duration-500">
+                                      {change.origin}
+                                    </div>
+                                    <div className="text-slate-400 text-[9px]">
+                                      -&gt;
+                                    </div>
+                                    <div className="text-red-700 font-bold animate-pulse">
+                                      {change.new}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  reg.value
+                                )}
                             </td>
                         </tr>
                     );

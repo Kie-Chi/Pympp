@@ -10,6 +10,16 @@ export interface Register {
   value: string;
 }
 
+export interface Change {
+  origin: string;
+  new: string;
+  reason: string;
+}
+
+export interface RegisterWithChange extends Register {
+  change?: Change;
+}
+
 export interface Forwarding {
   from_stage: string;
   to_stage: string;
@@ -20,6 +30,8 @@ export interface Events {
   registers_written: number[];
   memory_written: string[];
   forwarding: Forwarding[];
+  register_changes?: Record<string, Change>;
+  memory_changes?: Record<string, Change>;
 }
 
 export interface Snapshot {

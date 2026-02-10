@@ -16,6 +16,7 @@ export interface AppConfig {
     showRegisters: boolean;          // 是否显示寄存器
     showMemory: boolean;             // 是否显示内存
     enableForwardingVisualization: boolean;  // 是否显示 forwarding 线条
+    enableChangeVisualization: boolean;      // 是否显示数值变化动画
   };
   debug: {
     showPCInput: boolean;            // 是否显示 PC 输入框
@@ -42,6 +43,7 @@ export const defaultConfig: AppConfig = {
     showRegisters: true,
     showMemory: true,
     enableForwardingVisualization: true,
+    enableChangeVisualization: true,
   },
   debug: {
     showPCInput: true,
@@ -57,7 +59,9 @@ export const demoConfig: AppConfig = {
     enableEditing: false,            // 禁止编辑
   },
   controls: {
-    enableStep: true,    enableStepBack: false,           // 禁用回退    enableRun: false,
+    enableStep: true,    
+    enableStepBack: false,           // 禁用回退    
+    enableRun: false,
     enableContinue: false,
     enablePause: true,
     enableReset: false,              // 禁用重置
@@ -65,8 +69,9 @@ export const demoConfig: AppConfig = {
   ui: {
     showPipeline: true,
     showRegisters: true,
-    showMemory: true,               // 隐藏内存视图
-    enableForwardingVisualization: false,
+    showMemory: true,
+    enableForwardingVisualization: false,    
+    enableChangeVisualization: false,        // 禁用变化动画  
   },
   debug: {
     showPCInput: false,              // 隐藏 PC 输入

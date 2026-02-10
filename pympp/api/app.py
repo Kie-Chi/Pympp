@@ -10,7 +10,7 @@ from ..log import get_logger
 from .schema import (
     LoadResponse, ResetResponse, CycleInfo, MemoryPageResponse,
     SnapshotSchema, PipelineStageSchema, RegisterSchema, 
-    EventsSchema, ForwardingSchema
+    EventsSchema, ForwardingSchema, ChangeSchema
 )
 
 app = FastAPI(title="MIPS Pipeline Simulator API v2.0")
@@ -89,6 +89,9 @@ def _to_snapshot_schema(snap: Dict[str, Any], outofbound: bool = False) -> Snaps
     regs_written = []
     mem_written = []
     forwarding = []
+    
+    register_changes = {}
+    memory_changes = {}
 
     for b in behaviors:
         b_type = b.__class__.__name__ if not isinstance(b, dict) else b.get("type")
@@ -97,10 +100,43 @@ def _to_snapshot_schema(snap: Dict[str, Any], outofbound: bool = False) -> Snaps
             reg = getattr(b, "reg", None)
             if reg is None and isinstance(b, dict): reg = b.get("reg")
             regs_written.append(reg)
+            
+            val = getattr(b, "val", None)
+            if val is None and isinstance(b, dict): val = b.get("val")
+            
+            origin = getattr(b, "origin", 0)
+            if origin is None and isinstance(b, dict): origin = b.get("origin", 0)
+            
+            reason = getattr(b, "reason", "")
+            if reason is None and isinstance(b, dict): reason = b.get("reason", "")
+            
+            register_changes[str(reg)] = ChangeSchema(
+                origin=hex32(origin),
+                new=hex32(val),
+                reason=reason
+            )
+
         elif b_type == "MemWriteBehavior":
             addr = getattr(b, "addr", None)
             if addr is None and isinstance(b, dict): addr = b.get("addr")
             mem_written.append(hex32(addr))
+            
+            # Extract change info
+            val = getattr(b, "val", None)
+            if val is None and isinstance(b, dict): val = b.get("val")
+            
+            origin = getattr(b, "origin", 0)
+            if origin is None and isinstance(b, dict): origin = b.get("origin", 0)
+            
+            reason = getattr(b, "reason", "")
+            if reason is None and isinstance(b, dict): reason = b.get("reason", "")
+            
+            memory_changes[hex32(addr)] = ChangeSchema(
+                origin=hex32(origin),
+                new=hex32(val),
+                reason=reason
+            )
+
         elif b_type == "ForwardBehavior":
             from_stage = getattr(b, "from_stage", None)
             if from_stage is None and isinstance(b, dict): from_stage = b.get("from_stage")
@@ -120,7 +156,9 @@ def _to_snapshot_schema(snap: Dict[str, Any], outofbound: bool = False) -> Snaps
     events_data = EventsSchema(
         registers_written=regs_written,
         memory_written=mem_written,
-        forwarding=forwarding
+        forwarding=forwarding,
+        register_changes=register_changes,
+        memory_changes=memory_changes
     )
 
     return SnapshotSchema(

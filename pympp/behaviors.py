@@ -59,6 +59,8 @@ class RegWriteBehavior(Behavior):
     """register write back"""
     reg: int
     val: int
+    origin: int = 0
+    reason: str = ""
 
     def __str__(self):
         # $ 2 <= 000000ff
@@ -87,6 +89,8 @@ class MemWriteBehavior(Behavior):
     """memory write back"""
     addr: int
     val: int
+    origin: int = 0
+    reason: str = ""
 
     def __str__(self):
         # *00001000 <= 000000ff

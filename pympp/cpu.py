@@ -43,11 +43,14 @@ class RegisterFile:
         val = self.regs[reg_id]
         return val
 
-    def write(self, reg_id: int, value, pc: int):
-        data = Word(value)
+    def write(self, reg_id: int, change, pc: int):
+        data = change.new
         if reg_id != 0:
             self.regs[reg_id] = data
-            self.cpu.log_behavior(RegWriteBehavior(self.cpu.cycle, pc, reg_id, data.value))
+            self.cpu.log_behavior(RegWriteBehavior(
+                self.cpu.cycle, pc, reg_id, data.value, 
+                origin=change.origin.value, reason=change.reason
+            ))
 
 class Memory:
     def __init__(self, cpu):
@@ -64,11 +67,14 @@ class Memory:
     def copy(self):
         return self.data.copy()
 
-    def write(self, addr: int, value, pc: int):
-        data = Word(value)
+    def write(self, addr: int, change, pc: int):
+        data = change.new
         iaddr = int(addr)
         self.data[iaddr] = data
-        self.cpu.log_behavior(MemWriteBehavior(self.cpu.cycle, pc, iaddr, data.value))
+        self.cpu.log_behavior(MemWriteBehavior(
+            self.cpu.cycle, pc, iaddr, data.value,
+            origin=change.origin.value, reason=change.reason
+        ))
 
 class CPU:
     def __init__(self, machine_codes: List[int]):
@@ -107,7 +113,7 @@ class CPU:
         p = self.slots[Stage.WB]
         if not p: return
         for reg_id, change in p.alu.items():
-            self.regs.write(reg_id, change.new, p.pc)
+            self.regs.write(reg_id, change, p.pc)
         self.slots[Stage.WB] = None
 
     def _stage_mem(self):
@@ -116,7 +122,7 @@ class CPU:
             p.advance()
             p.instr.execute(p)
             for addr, change in p.mem.items():
-                self.dmem.write(addr, change.new, p.pc)
+                self.dmem.write(addr, change, p.pc)
             self.slots[Stage.WB] = p
             self.slots[Stage.MEM] = None
 
