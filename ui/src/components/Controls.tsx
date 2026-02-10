@@ -141,12 +141,14 @@ const Controls: React.FC<Props> = ({
       </div>
 
       {/* Cycle Info */}
-      <div className="flex justify-between items-center px-1">
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</span>
-        <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono border border-slate-200">
-            Cycle: {cycle}
-        </span>
-      </div>
+      {isAssembled && (
+        <div className="flex justify-between items-center px-1">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</span>
+          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono border border-slate-200">
+              Cycle: {cycle}
+          </span>
+        </div>
+      )}
 
       {/* Navigation (Only show when assembled) */}
       {isAssembled && (
@@ -156,7 +158,7 @@ const Controls: React.FC<Props> = ({
                 <input 
                     type="range" 
                     min="0" 
-                    max={Math.max(cycle + 20, 100)} 
+                    max={Math.max(cycle * 2, 100)} 
                     value={sliderValue} 
                     onChange={handleSliderChange}
                     disabled={loading}
@@ -165,7 +167,7 @@ const Controls: React.FC<Props> = ({
                 <div className="flex justify-between text-[10px] text-slate-400 mt-1">
                     <span>0</span>
                     <span className="font-bold text-blue-600">{sliderValue}</span>
-                    <span>{Math.max(cycle + 20, 100)}</span>
+                    <span>{Math.max(cycle * 2, 100)}</span>
                 </div>
             </div>
 
