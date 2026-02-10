@@ -1,8 +1,24 @@
 import axios from 'axios';
 import { LoadResponse, ResetResponse, Snapshot, CycleInfo, MemoryPageResponse } from '../types/schema';
 
+// Generate or retrieve session ID
+const getSessionId = () => {
+  let sessionId = localStorage.getItem('mips_session_id');
+  if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    localStorage.setItem('mips_session_id', sessionId);
+  }
+  return sessionId;
+};
+
 const api = axios.create({
   baseURL: '/api',
+});
+
+// Add interceptor to include Session ID in all requests
+api.interceptors.request.use((config) => {
+  config.headers['X-Session-ID'] = getSessionId();
+  return config;
 });
 
 export const loadProgram = async (asmSource: string): Promise<LoadResponse> => {

@@ -1,5 +1,5 @@
 from venv import logger
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from ..cpu import CPU
@@ -12,6 +12,8 @@ from .schema import (
     SnapshotSchema, PipelineStageSchema, RegisterSchema, 
     EventsSchema, ForwardingSchema, ChangeSchema
 )
+from datetime import datetime, timedelta
+import time
 
 app = FastAPI(title="MIPS Pipeline Simulator API v2.0")
 logger = get_logger(__name__)
@@ -30,6 +32,7 @@ class Simulator:
         self.source_map: Dict[str, int] = {}
         self.asm_source: str = ""
         self.display_cycle: int = 0
+        self.last_access: float = time.time()
 
     def load(self, asm_source: str):
         self.asm_source = asm_source
@@ -37,6 +40,7 @@ class Simulator:
         self.cpu = CPU(machine_codes)
         self.source_map = source_map
         self.display_cycle = 0
+        self.last_access = time.time()
         return True
 
     def is_finished(self) -> bool:
@@ -58,8 +62,65 @@ class Simulator:
     def ensure_cpu(self):
         if not self.cpu:
             raise HTTPException(status_code=400, detail="Program not loaded")
+    
+    def touch(self):
+        """Update last access time"""
+        self.last_access = time.time()
 
-manager = Simulator()
+
+# Session Manager
+class SessionManager:
+    def __init__(self, session_timeout_minutes: int = 60):
+        self.sessions: Dict[str, Simulator] = {}
+        self.session_timeout = session_timeout_minutes * 60  # Convert to seconds
+        
+    def get_session(self, session_id: str) -> Simulator:
+        """Get or create a simulator for the given session ID"""
+        if session_id not in self.sessions:
+            logger.info(f"Creating new simulator session: {session_id}")
+            self.sessions[session_id] = Simulator()
+        else:
+            self.sessions[session_id].touch()
+        
+        return self.sessions[session_id]
+    
+    def cleanup_expired_sessions(self):
+        """Remove sessions that have been inactive for too long"""
+        current_time = time.time()
+        expired_sessions = [
+            sid for sid, sim in self.sessions.items()
+            if current_time - sim.last_access > self.session_timeout
+        ]
+        
+        for sid in expired_sessions:
+            logger.info(f"Cleaning up expired session: {sid}")
+            del self.sessions[sid]
+        
+        return len(expired_sessions)
+    
+    def get_active_sessions_count(self) -> int:
+        """Get the number of active sessions"""
+        return len(self.sessions)
+
+
+# Global session manager
+session_manager = SessionManager(session_timeout_minutes=60)
+
+
+# Dependency to get simulator instance for current session
+def get_simulator(x_session_id: Optional[str] = Header(None, alias="X-Session-ID")) -> Simulator:
+    if not x_session_id:
+        raise HTTPException(status_code=400, detail="Session ID is required")
+    
+    # Periodically cleanup expired sessions (every 100 requests or so)
+    import random
+    if random.randint(1, 100) == 1:
+        cleaned = session_manager.cleanup_expired_sessions()
+        if cleaned > 0:
+            logger.info(f"Cleaned up {cleaned} expired sessions")
+    
+    return session_manager.get_session(x_session_id)
+
 
 class LoadRequest(BaseModel):
     asm_source: str
@@ -171,8 +232,25 @@ def _to_snapshot_schema(snap: Dict[str, Any], outofbound: bool = False) -> Snaps
         events=events_data
     )
 
+# Health check and session info endpoints
+@app.get("/health")
+def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "ok",
+        "active_sessions": session_manager.get_active_sessions_count()
+    }
+
+@app.get("/sessions/info")
+def session_info():
+    """Get information about active sessions"""
+    return {
+        "active_sessions": session_manager.get_active_sessions_count(),
+        "session_timeout_minutes": session_manager.session_timeout / 60
+    }
+
 @app.post("/load_program", response_model=LoadResponse)
-def load_program(req: LoadRequest):
+def load_program(req: LoadRequest, manager: Simulator = Depends(get_simulator)):
     try:
         manager.load(req.asm_source)
         return LoadResponse(success=True, message="Program loaded and simulator reset.")
@@ -180,12 +258,12 @@ def load_program(req: LoadRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/get_source_map")
-def get_source_map():
+def get_source_map(manager: Simulator = Depends(get_simulator)):
     manager.ensure_cpu()
     return manager.source_map
 
 @app.post("/step_cycle", response_model=SnapshotSchema)
-def step_cycle():
+def step_cycle(manager: Simulator = Depends(get_simulator)):
     manager.ensure_cpu()
     
     if manager.display_cycle < manager.cpu.cycle:
@@ -208,7 +286,7 @@ def step_cycle():
     return _to_snapshot_schema(manager.cpu.history[manager.display_cycle])
 
 @app.post("/step_back", response_model=SnapshotSchema)
-def step_back():
+def step_back(manager: Simulator = Depends(get_simulator)):
     manager.ensure_cpu()
     if manager.display_cycle > 0:
         manager.display_cycle -= 1
@@ -216,7 +294,7 @@ def step_back():
     return _to_snapshot_schema(manager.cpu.history[manager.display_cycle])
 
 @app.post("/continue", response_model=SnapshotSchema)
-def continue_exec():
+def continue_exec(manager: Simulator = Depends(get_simulator)):
     manager.ensure_cpu()
     # Jump to head
     manager.display_cycle = manager.cpu.cycle
@@ -225,7 +303,7 @@ def continue_exec():
     return _to_snapshot_schema(manager.cpu.history[manager.display_cycle])
 
 @app.post("/run_until_end", response_model=List[SnapshotSchema])
-def run_until_end(max_cycles: int = 1000):
+def run_until_end(max_cycles: int = 1000, manager: Simulator = Depends(get_simulator)):
     manager.ensure_cpu()
     
     # Run loop
@@ -248,7 +326,7 @@ def run_until_end(max_cycles: int = 1000):
     return [_to_snapshot_schema(snap) for snap in manager.cpu.history]
 
 @app.post("/reset", response_model=ResetResponse)
-def reset():
+def reset(manager: Simulator = Depends(get_simulator)):
     if manager.asm_source:
         manager.load(manager.asm_source)
     else:
@@ -256,7 +334,7 @@ def reset():
     return ResetResponse(success=True, message="Simulator reset with the current program.")
 
 @app.get("/get_snapshot/{cycle}", response_model=SnapshotSchema)
-def get_snapshot(cycle: int):
+def get_snapshot(cycle: int, manager: Simulator = Depends(get_simulator)):
     manager.ensure_cpu()
     steps_taken = 0
     MAX_STEPS_PER_REQUEST = 2000
@@ -290,12 +368,12 @@ def get_snapshot(cycle: int):
     raise HTTPException(status_code=404, detail="Simulation finished")
 
 @app.get("/get_current_cycle", response_model=CycleInfo)
-def get_current_cycle():
+def get_current_cycle(manager: Simulator = Depends(get_simulator)):
     manager.ensure_cpu()
     return CycleInfo(cycle=manager.cpu.cycle)
 
 @app.get("/find_cycle_by_pc/{pc}", response_model=Dict[str, Optional[int]])
-def find_cycle_by_pc(pc: str):
+def find_cycle_by_pc(pc: str, manager: Simulator = Depends(get_simulator)):
     """
     Finds the first cycle where the instruction at the given PC entered the IF stage.
     """
@@ -308,7 +386,7 @@ def find_cycle_by_pc(pc: str):
     return {"cycle": None}
 
 @app.get("/get_memory_page", response_model=MemoryPageResponse)
-def get_memory_page(start_addr: str, lines: int = 16, cycle: Optional[int] = None):
+def get_memory_page(start_addr: str, lines: int = 16, cycle: Optional[int] = None, manager: Simulator = Depends(get_simulator)):
     """
     Returns a list of memory values starting from start_addr.
     If cycle is provided, returns memory state at that cycle.

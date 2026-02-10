@@ -1,1 +1,2 @@
-from .app import Simulator, app, manager
+from .app import Simulator, app, session_manager
+
