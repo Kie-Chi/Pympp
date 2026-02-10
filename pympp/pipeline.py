@@ -16,7 +16,7 @@ class Pool:
         if reg == 0: return
         
         for s in [Stage.EX, Stage.MEM, Stage.WB]:
-            prod_packet = self.cpu.slots[s]
+            prod_packet = self.cpu.shadows[s]
             if not prod_packet: continue
             
             if prod_packet.instr.get_wreg() == reg:

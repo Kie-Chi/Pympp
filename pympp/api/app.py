@@ -34,6 +34,22 @@ class Simulator:
         self.source_map = source_map
         return True
 
+    def is_finished(self) -> bool:
+        if not self.cpu:
+            return True
+
+        idx = (self.cpu.pc - 0x3000) // 4
+        pc_out_of_bounds = not (0 <= idx < len(self.cpu.imem))
+        
+        # Check pipeline empty
+        pipeline_empty = True
+        for s in self.cpu.slots.values():
+            if s is not None:
+                pipeline_empty = False
+                break
+        
+        return pc_out_of_bounds and pipeline_empty
+
     def ensure_cpu(self):
         if not self.cpu:
             raise HTTPException(status_code=400, detail="Program not loaded")
@@ -48,7 +64,7 @@ def _to_snapshot_schema(snap: Dict[str, Any]) -> SnapshotSchema:
     for stage_name, stage_info in snap["pipeline"].items():
         if stage_info:
             pipeline_data[stage_name] = PipelineStageSchema(
-                pc=hex32(stage_info["pc"]),
+                pc=stage_info["pc"],
                 instr=stage_info["instr"],
                 is_bubble=stage_info["is_bubble"],
                 is_stall=stage_info["is_stall"]
@@ -163,9 +179,23 @@ def reset():
 @app.get("/get_snapshot/{cycle}", response_model=SnapshotSchema)
 def get_snapshot(cycle: int):
     manager.ensure_cpu()
+    steps_taken = 0
+    MAX_STEPS_PER_REQUEST = 2000
+    
+    while cycle >= len(manager.cpu.history):
+        if manager.is_finished():
+            break
+        
+        if steps_taken > MAX_STEPS_PER_REQUEST:
+             break
+             
+        manager.cpu.step()
+        steps_taken += 1
+        
+    # Check if we have the requested cycle
     if 0 <= cycle < len(manager.cpu.history):
         return _to_snapshot_schema(manager.cpu.history[cycle])
-    raise HTTPException(status_code=404, detail="Cycle not found")
+    raise HTTPException(status_code=404, detail="Simulation finished")
 
 @app.get("/get_current_cycle", response_model=CycleInfo)
 def get_current_cycle():
@@ -191,8 +221,13 @@ def get_memory_page(start_addr: str, lines: int = 16):
     Returns a list of memory values starting from start_addr.
     """
     manager.ensure_cpu()
-    
-    start_val = int(start_addr, 16)
+    try:
+        start_val = int(start_addr, 16)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid address format")
+
+    if start_val < 0:
+        raise HTTPException(status_code=400, detail="Start address must be non-negative")
     values = []
     
     for i in range(lines):

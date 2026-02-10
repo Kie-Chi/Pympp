@@ -72,7 +72,7 @@ class Memory:
 
 class CPU:
     def __init__(self, machine_codes: List[int]):
-        self.pc = 0x3000
+        self.pc = 0x3000 - 4
         self.regs: RegisterFile = RegisterFile(self)
         self.imem = machine_codes
         self.dmem: Memory = Memory(self)
@@ -83,27 +83,32 @@ class CPU:
         
         self.current_behaviors: List[Behavior] = []
         self.history: List[Snapshot] = []
+        self.__pre_load()
+
+    def __pre_load(self):
+        self._stage_if()
 
     def log_behavior(self, b):
         self.current_behaviors.append(b)
 
     def step(self):
         self.cycle += 1
+        curpc = self.pc
         self.current_behaviors = []
         self.shadows = self.slots.copy()
         self._stage_wb()
         self._stage_mem()
         self._stage_ex()
-        is_stalled = self._stage_id()
-        self._stage_if(is_stalled)
-        self.capture_snapshot()
+        self._stage_id()
+        self._stage_if()
+        self.capture_snapshot(curpc)
 
     def _stage_wb(self):
         p = self.slots[Stage.WB]
         if not p: return
-        p.advance()
         for reg_id, change in p.alu.items():
             self.regs.write(reg_id, change.new, p.pc)
+        self.slots[Stage.WB] = None
 
     def _stage_mem(self):
         p = self.slots[Stage.MEM]
@@ -112,60 +117,62 @@ class CPU:
             p.instr.execute(p)
             for addr, change in p.mem.items():
                 self.dmem.write(addr, change.new, p.pc)
-        self.slots[Stage.WB] = p
+            self.slots[Stage.WB] = p
+            self.slots[Stage.MEM] = None
 
     def _stage_ex(self):
         p = self.slots[Stage.EX]
         if p:
             p.advance()
             p.instr.execute(p)
-        self.slots[Stage.MEM] = p
-
-    def _stage_id(self) -> bool:
-        p = self.slots[Stage.ID]
-        if not p:
+            self.slots[Stage.MEM] = p
             self.slots[Stage.EX] = None
-            return False
 
-        try:
-            if p.stage != Stage.ID:
-                p.advance()
-            self.pool.check_stall(p)
-            p.instr.execute(p) 
-            self.slots[Stage.EX] = p
-            return False
+    def _stage_id(self):
+        p_id = self.slots[Stage.ID]
+        if p_id:
+            try:
+                self.pool.check_stall(p_id)
+                if p_id.stage == Stage.IF:
+                    p_id.advance()
+                p_id.instr.execute(p_id)
+                if p_id.npc != p_id.pc + 4:
+                    self.pc = p_id.npc
+                    self.log_behavior(BranchBehavior(self.cycle, p_id.pc, p_id.npc, taken=True))
+                self.slots[Stage.EX] = p_id
+                self.slots[Stage.ID] = None
+                
+            except StallException as e:
+                self.log_behavior(StallBehavior(self.cycle, p_id.pc, "ID", str(e)))
+                bubble_pkt = Packet(pool=self.pool, pc=0, instr=Bubble(0))
+                bubble_pkt.stage = Stage.EX
+                self.slots[Stage.EX] = bubble_pkt
+                return # Do not pull from IF
+        if self.slots[Stage.ID] is None:
+            p_if = self.slots[Stage.IF]
+            if p_if:
+                self.slots[Stage.ID] = p_if
+                if p_if.stage == Stage.IF:
+                    p_if.advance()
+                self.slots[Stage.IF] = None
 
-        except StallException as e:
-            bubble_pkt = Packet(
-                pool=self.pool, 
-                pc=0, 
-                instr=Bubble(0) 
-            )
-            self.slots[Stage.EX] = bubble_pkt
-            self.log_behavior(StallBehavior(self.cycle, p.pc, "ID", str(e)))
-            return True
-
-    def _stage_if(self, is_stalled: bool):
-        if is_stalled:
-            return
-        
-        fetch_pc = self.pc
-        p_prev_id = self.slots[Stage.EX]         
-        if p_prev_id and p_prev_id.npc != p_prev_id.pc + 4:
-            self.pc = p_prev_id.npc
-            self.log_behavior(BranchBehavior(self.cycle, p_prev_id.pc, p_prev_id.npc, taken=True))
-        else:
+    def _stage_if(self):
+        if self.slots[Stage.IF] is None:
             self.pc += 4
+            fetch_pc = self.pc
+            
+            # Fetch
+            idx = (fetch_pc - 0x3000) // 4
+            if 0 <= idx < len(self.imem):
+                instr_code = self.imem[idx]
+                instr = decode(instr_code, fetch_pc)
+                pkt = Packet(pool=self.pool, pc=fetch_pc, instr=instr)
+                pkt.stage = Stage.IF 
+                self.slots[Stage.IF] = pkt
+            else:
+                self.slots[Stage.IF] = None
 
-        idx = (fetch_pc - 0x3000) // 4
-        if 0 <= idx < len(self.imem):
-            instr_code = self.imem[idx]
-            instr = decode(instr_code, fetch_pc)
-            self.slots[Stage.ID] = Packet(pool=self.pool, pc=fetch_pc, instr=instr)
-        else:
-            self.slots[Stage.ID] = None
-
-    def capture_snapshot(self):
+    def capture_snapshot(self, cur_pc: int):
         pipeline_snap = {}
         s = Stage.IF
         while s != Stage.END:
@@ -202,7 +209,7 @@ class CPU:
 
         self.history.append({
             "cycle": self.cycle,
-            "pc": hex32(self.pc),
+            "pc": hex32(cur_pc),
             "gpr": [hex32(r.value) for r in self.regs],
             "memory": {hex32(addr): hex32(val.value) for addr, val in self.dmem.copy().items()},
             "pipeline": pipeline_snap,
