@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 
 interface Props {
   asmSource: string;
@@ -12,6 +13,7 @@ const InstructionInput: React.FC<Props> = ({ asmSource, setAsmSource, currentLin
   const lines = asmSource.split('\n');
 
   const [scrollTop, setScrollTop] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Auto-scroll to current line
   useEffect(() => {
@@ -33,10 +35,23 @@ const InstructionInput: React.FC<Props> = ({ asmSource, setAsmSource, currentLin
   // So we create a "backdrop" div that mirrors the textarea content
   
   return (
-    <div className="flex flex-col h-full border border-gray-200 rounded-lg shadow-sm bg-white overflow-hidden">
+    <div className={`flex flex-col border border-gray-200 rounded-lg shadow-sm bg-white overflow-hidden transition-all duration-300 ${
+      isFullscreen 
+        ? 'fixed inset-4 z-50 h-auto' 
+        : 'h-full relative'
+    }`}>
       <div className="bg-slate-50 px-4 py-3 border-b border-gray-200 font-semibold text-slate-700 flex justify-between items-center">
-        <span>Editor</span>
-        <span className="text-xs text-slate-400 font-normal">MIPS Assembly</span>
+        <div className="flex items-center gap-2">
+            <span>Editor</span>
+            <span className="text-xs text-slate-400 font-normal">MIPS Assembly</span>
+        </div>
+        <button 
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded hover:bg-slate-200"
+            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+        >
+            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+        </button>
       </div>
       <div className="relative flex-1 flex overflow-hidden">
         {/* Line Numbers */}

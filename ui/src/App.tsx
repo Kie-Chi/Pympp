@@ -281,10 +281,10 @@ function App() {
 
           {/* Middle Column: Pipeline Visualization & Memory */}
           <div className="flex flex-col gap-4 min-h-0 h-full">
-            <div className="flex-1 min-h-0">
+            <div className="h-[40%] min-h-[300px] flex-shrink-0">
                 <PipelineVisualizer snapshot={snapshot} />
             </div>
-            <div className="h-40 flex-shrink-0">
+            <div className="flex-1 min-h-0">
                 <MemoryView 
                     memory={snapshot?.memory} 
                     cycle={snapshot?.cycle || 0} 
