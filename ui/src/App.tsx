@@ -1,3 +1,4 @@
+import { appConfig } from './config';
 import { useState, useEffect, useCallback } from 'react';
 import { loadProgram, stepCycle, stepBack, continueExec, runUntilEnd, resetSimulator, getSnapshot, getSourceMap, findCycleByPc, getCurrentCycle } from './api/client';
 import { Snapshot } from './types/schema';
@@ -221,6 +222,46 @@ function App() {
       setSnapshot(null);
       setError(null);
   };
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.defaultPrevented) return;
+
+        // F5: Run / Continue
+        if (e.key === 'F5') {
+            e.preventDefault();
+            if (isAssembled) {
+                if (appConfig.controls.enableContinue) handleContinue();
+            } else {
+                handleLoad();
+            }
+        }
+        // F6: Assemble / Load
+        else if (e.key === 'F6') {
+            e.preventDefault();
+            handleLoad();
+        }
+        // F10: Step Forward
+        else if (e.key === 'F10') {
+            e.preventDefault();
+            if (isAssembled && appConfig.controls.enableStep) handleStep();
+        }
+        // F11: Step Back
+        else if (e.key === 'F11') {
+            e.preventDefault();
+            if (isAssembled && appConfig.controls.enableStepBack) handleStepBack();
+        }
+        // Esc: Stop
+        else if (e.key === 'Escape') {
+            e.preventDefault();
+            if (appConfig.controls.enablePause) handleStop();
+        }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isAssembled, handleLoad, handleStep, handleStepBack, handleContinue, handleStop]);
 
   // Determine current line from PC
   const currentLine = snapshot && sourceMap 
