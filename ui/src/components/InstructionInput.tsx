@@ -29,10 +29,6 @@ const InstructionInput: React.FC<Props> = ({ asmSource, setAsmSource, currentLin
         }
     }
   }, [currentLine]);
-
-  // Handle highlighing logic properly
-  // Since we use a simple textarea, we can't easily highlight full width background for one line behind the text
-  // So we create a "backdrop" div that mirrors the textarea content
   
   return (
     <div className={`flex flex-col border border-gray-200 rounded-lg shadow-sm bg-white overflow-hidden transition-all duration-300 ${
@@ -64,7 +60,7 @@ const InstructionInput: React.FC<Props> = ({ asmSource, setAsmSource, currentLin
               key={i} 
               className={`px-2 text-xs leading-6 font-mono transition-colors duration-200 ${
                 currentLine === i + 1 
-                  ? 'text-blue-600 font-bold' 
+                  ? 'text-yellow-700 font-bold bg-yellow-100' 
                   : 'text-slate-400'
               }`}
             >
@@ -84,7 +80,7 @@ const InstructionInput: React.FC<Props> = ({ asmSource, setAsmSource, currentLin
                 }}
             >
                 {lines.map((line, i) => (
-                    <div key={i} className={`w-full h-6 ${currentLine === i + 1 ? 'bg-blue-100/50 -mx-2 px-2' : ''}`}>
+                    <div key={i} className={`w-full h-6 ${currentLine === i + 1 ? 'bg-yellow-200/90 -mx-2 px-2 border-l-4 border-yellow-500 shadow-sm' : ''}`}>
                          {/* Empty content, just for background */}
                     </div>
                 ))}
