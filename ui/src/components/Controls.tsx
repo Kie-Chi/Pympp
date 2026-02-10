@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Wrench, Play, SkipForward, RotateCcw, Square, ArrowRight, StepBack, ToggleLeft, ToggleRight } from 'lucide-react';
+import { appConfig } from '../config';
 
 interface Props {
   onAssemble: () => void;
@@ -42,6 +43,8 @@ const Controls: React.FC<Props> = ({
 
   // Debounce helper
   useEffect(() => {
+    if (!appConfig.debug.enableCycleSlider) return; // Don't jump if slider is disabled
+    
     const timer = setTimeout(() => {
         if (sliderValue !== cycle) {
             onJumpCycle(sliderValue);
@@ -51,12 +54,14 @@ const Controls: React.FC<Props> = ({
   }, [sliderValue]);
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!appConfig.debug.enableCycleSlider) return; // Prevent change if disabled
       let val = parseInt(e.target.value);
       // Optional: Visual clamp if we know max?
       setSliderValue(val);
   };
 
   const handleSliderCommit = () => {
+      if (!appConfig.debug.enableCycleSlider) return; // Prevent jump if disabled
       if (sliderValue !== cycle) {
           onJumpCycle(sliderValue);
       }
@@ -79,18 +84,18 @@ const Controls: React.FC<Props> = ({
             <>
                 <div className="flex items-center gap-0.5">
                     <button 
-                        onClick={onStepBack}
-                        disabled={loading || cycle <= 0}
+                        onClick={appConfig.controls.enableStepBack ? onStepBack : undefined}
+                        disabled={loading || cycle <= 0 || !appConfig.controls.enableStepBack}
                         title="Step Back"
-                        className="p-2 text-slate-600 hover:bg-slate-100 rounded-md transition-colors disabled:opacity-50"
+                        className="p-2 text-slate-600 hover:bg-slate-100 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <StepBack size={20} />
                     </button>
                     <button 
-                        onClick={onStep} 
-                        disabled={loading}
+                        onClick={appConfig.controls.enableStep ? onStep : undefined} 
+                        disabled={loading || !appConfig.controls.enableStep}
                         title="Step Forward"
-                        className="p-2 text-green-600 hover:bg-green-100 rounded-md transition-colors disabled:opacity-50"
+                        className="p-2 text-green-600 hover:bg-green-100 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <div className="relative">
                             <Play size={20} />
@@ -102,28 +107,28 @@ const Controls: React.FC<Props> = ({
                 <div className="w-px h-6 bg-gray-200 mx-1"></div>
 
                 <button 
-                    onClick={onContinue} 
-                    disabled={loading}
+                    onClick={appConfig.controls.enableContinue ? onContinue : undefined} 
+                    disabled={loading || !appConfig.controls.enableContinue}
                     title="Continue"
-                    className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-md transition-colors disabled:opacity-50"
+                    className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <SkipForward size={20} />
                 </button>
 
                 <button 
-                    onClick={onRun} 
-                    disabled={loading}
+                    onClick={appConfig.controls.enableRun ? onRun : undefined} 
+                    disabled={loading || !appConfig.controls.enableRun}
                     title="Run Until End"
-                    className="p-2 text-purple-600 hover:bg-purple-100 rounded-md transition-colors disabled:opacity-50"
+                    className="p-2 text-purple-600 hover:bg-purple-100 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Play size={20} />
                 </button>
                 <div className="w-px h-6 bg-gray-200 mx-1"></div>
                 <button 
-                    onClick={onStop} 
-                    disabled={loading}
+                    onClick={appConfig.controls.enablePause ? onStop : undefined} 
+                    disabled={loading || !appConfig.controls.enablePause}
                     title="Stop"
-                    className="p-2 text-red-600 hover:bg-red-100 rounded-md transition-colors disabled:opacity-50"
+                    className="p-2 text-red-600 hover:bg-red-100 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Square size={20} fill="currentColor" className="scale-75" />
                 </button>
@@ -161,8 +166,8 @@ const Controls: React.FC<Props> = ({
                     max={Math.max(cycle * 2, 100)} 
                     value={sliderValue} 
                     onChange={handleSliderChange}
-                    disabled={loading}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                    disabled={loading || !appConfig.debug.enableCycleSlider}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <div className="flex justify-between text-[10px] text-slate-400 mt-1">
                     <span>0</span>
@@ -171,22 +176,26 @@ const Controls: React.FC<Props> = ({
                 </div>
             </div>
 
-            <div className="flex gap-2 items-center">
-            <input 
-                type="text" 
-                placeholder="PC (hex)" 
-                value={targetPc}
-                onChange={(e) => setTargetPc(e.target.value)}
-                className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-mono focus:ring-1 focus:ring-blue-500 outline-none"
-            />
-            <button 
-                onClick={() => onJumpPc(targetPc)}
-                className="p-1 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded hover:bg-indigo-100"
-                title="Go to PC"
-            >
-                <ArrowRight size={14} />
-            </button>
-            </div>
+            {appConfig.debug.showPCInput && (
+              <div className="flex gap-2 items-center">
+                <input 
+                    type="text" 
+                    placeholder="PC (hex)" 
+                    value={targetPc}
+                    onChange={(e) => setTargetPc(e.target.value)}
+                    disabled={!appConfig.debug.enableManualPC}
+                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-mono focus:ring-1 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                />
+                <button 
+                    onClick={appConfig.debug.enableManualPC ? () => onJumpPc(targetPc) : undefined}
+                    disabled={!appConfig.debug.enableManualPC}
+                    className="p-1 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Go to PC"
+                >
+                    <ArrowRight size={14} />
+                </button>
+              </div>
+            )}
         </div>
       )}
     </div>

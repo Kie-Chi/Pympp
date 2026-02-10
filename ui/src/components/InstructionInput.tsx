@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
+import { appConfig } from '../config';
 
 interface Props {
   asmSource: string;
@@ -41,13 +42,15 @@ const InstructionInput: React.FC<Props> = ({ asmSource, setAsmSource, currentLin
             <span>Editor</span>
             <span className="text-xs text-slate-400 font-normal">MIPS Assembly</span>
         </div>
-        <button 
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded hover:bg-slate-200"
-            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-        >
-            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-        </button>
+        {appConfig.editor.enableFullscreen && (
+          <button 
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded hover:bg-slate-200"
+              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+          >
+              {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
+        )}
       </div>
       <div className="relative flex-1 flex overflow-hidden">
         {/* Line Numbers */}
@@ -93,7 +96,7 @@ const InstructionInput: React.FC<Props> = ({ asmSource, setAsmSource, currentLin
             value={asmSource}
             onChange={(e) => setAsmSource(e.target.value)}
             onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
-            disabled={disabled}
+            disabled={disabled || !appConfig.editor.enableEditing}
             spellCheck={false}
             placeholder="Enter MIPS assembly code here..."
             />

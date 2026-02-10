@@ -6,6 +6,7 @@ import Controls from './components/Controls';
 import PipelineVisualizer from './components/PipelineVisualizer';
 import RegisterFile from './components/RegisterFile';
 import MemoryView from './components/MemoryView';
+import ConfigPanel from './components/ConfigPanel';
 
 const DEFAULT_ASM = `# Bubble Sort Implementation
 # Initialize array in memory
@@ -302,6 +303,9 @@ function App() {
           </div>
 
       </main>
+      
+      {/* Configuration Panel */}
+      <ConfigPanel />
     </div>
   );
 }

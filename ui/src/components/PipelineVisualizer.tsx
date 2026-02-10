@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Snapshot } from '../types/schema';
+import { appConfig } from '../config';
 
 interface Props {
   snapshot: Snapshot | null;
@@ -70,6 +71,9 @@ const PipelineVisualizer: React.FC<Props> = ({ snapshot }) => {
   };
 
   const renderForwardingLines = () => {
+      // Check if forwarding visualization is enabled
+      if (!appConfig.ui.enableForwardingVisualization) return null;
+      
       if (!snapshot.events?.forwarding || snapshot.events.forwarding.length === 0 || dimensions.width === 0) return null;
 
       return (
