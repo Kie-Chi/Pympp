@@ -1,3 +1,4 @@
+from venv import logger
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
@@ -5,6 +6,7 @@ from ..cpu import CPU
 from .assembler import assemble
 from ..util.type import hex32
 from ..base import Stage
+from ..log import get_logger
 from .schema import (
     LoadResponse, ResetResponse, CycleInfo, MemoryPageResponse,
     SnapshotSchema, PipelineStageSchema, RegisterSchema, 
@@ -12,6 +14,7 @@ from .schema import (
 )
 
 app = FastAPI(title="MIPS Pipeline Simulator API v2.0")
+logger = get_logger(__name__)
 
 # Register name mapping
 REG_NAMES = [
@@ -26,12 +29,14 @@ class Simulator:
         self.cpu: Optional[CPU] = None
         self.source_map: Dict[str, int] = {}
         self.asm_source: str = ""
+        self.display_cycle: int = 0
 
     def load(self, asm_source: str):
         self.asm_source = asm_source
         machine_codes, source_map = assemble(asm_source)
         self.cpu = CPU(machine_codes)
         self.source_map = source_map
+        self.display_cycle = 0
         return True
 
     def is_finished(self) -> bool:
@@ -143,8 +148,42 @@ def get_source_map():
 @app.post("/step_cycle", response_model=SnapshotSchema)
 def step_cycle():
     manager.ensure_cpu()
+    
+    if manager.display_cycle < manager.cpu.cycle:
+        if manager.display_cycle + 1 < len(manager.cpu.history):
+            manager.display_cycle += 1
+            return _to_snapshot_schema(manager.cpu.history[manager.display_cycle])    
+    # Else need to run simulation
+    if manager.is_finished():
+         if manager.cpu.history:
+             manager.display_cycle = manager.cpu.cycle
+             return _to_snapshot_schema(manager.cpu.history[-1])
+    
     manager.cpu.step()
-    return _to_snapshot_schema(manager.cpu.history[-1])
+    manager.display_cycle = manager.cpu.cycle
+    
+    # Check bounds again just to be safe
+    if manager.display_cycle >= len(manager.cpu.history):
+        manager.display_cycle = len(manager.cpu.history) - 1
+        
+    return _to_snapshot_schema(manager.cpu.history[manager.display_cycle])
+
+@app.post("/step_back", response_model=SnapshotSchema)
+def step_back():
+    manager.ensure_cpu()
+    if manager.display_cycle > 0:
+        manager.display_cycle -= 1
+    
+    return _to_snapshot_schema(manager.cpu.history[manager.display_cycle])
+
+@app.post("/continue", response_model=SnapshotSchema)
+def continue_exec():
+    manager.ensure_cpu()
+    # Jump to head
+    manager.display_cycle = manager.cpu.cycle
+    if manager.display_cycle >= len(manager.cpu.history):
+        manager.display_cycle = len(manager.cpu.history) - 1
+    return _to_snapshot_schema(manager.cpu.history[manager.display_cycle])
 
 @app.post("/run_until_end", response_model=List[SnapshotSchema])
 def run_until_end(max_cycles: int = 1000):
@@ -166,6 +205,7 @@ def run_until_end(max_cycles: int = 1000):
             
         manager.cpu.step()
         
+    manager.display_cycle = manager.cpu.cycle
     return [_to_snapshot_schema(snap) for snap in manager.cpu.history]
 
 @app.post("/reset", response_model=ResetResponse)
@@ -184,9 +224,11 @@ def get_snapshot(cycle: int):
     
     while cycle >= len(manager.cpu.history):
         if manager.is_finished():
+            logger.info(f"Simulation finished after {manager.cpu.cycle} cycles")
             break
         
         if steps_taken > MAX_STEPS_PER_REQUEST:
+             logger.warning(f"Stopped after {steps_taken} steps to prevent infinite loop")
              break
              
         manager.cpu.step()
@@ -194,7 +236,18 @@ def get_snapshot(cycle: int):
         
     # Check if we have the requested cycle
     if 0 <= cycle < len(manager.cpu.history):
+        manager.display_cycle = cycle
         return _to_snapshot_schema(manager.cpu.history[cycle])
+    
+    # If simulation finished or stopped before reaching cycle
+    if manager.cpu.history:
+        if manager.is_finished():
+             manager.display_cycle = manager.cpu.history[-1]["cycle"]
+             return _to_snapshot_schema(manager.cpu.history[-1])
+        else:
+             manager.display_cycle = manager.cpu.history[-1]["cycle"]
+             return _to_snapshot_schema(manager.cpu.history[-1])
+
     raise HTTPException(status_code=404, detail="Simulation finished")
 
 @app.get("/get_current_cycle", response_model=CycleInfo)
@@ -216,9 +269,11 @@ def find_cycle_by_pc(pc: str):
     return {"cycle": None}
 
 @app.get("/get_memory_page", response_model=MemoryPageResponse)
-def get_memory_page(start_addr: str, lines: int = 16):
+def get_memory_page(start_addr: str, lines: int = 16, cycle: Optional[int] = None):
     """
     Returns a list of memory values starting from start_addr.
+    If cycle is provided, returns memory state at that cycle.
+    Otherwise returns current CPU memory state.
     """
     manager.ensure_cpu()
     try:
@@ -228,12 +283,26 @@ def get_memory_page(start_addr: str, lines: int = 16):
 
     if start_val < 0:
         raise HTTPException(status_code=400, detail="Start address must be non-negative")
+    
+    mem_source = None
+    if cycle is not None:
+        if 0 <= cycle < len(manager.cpu.history):
+            mem_source = manager.cpu.history[cycle]["memory"]
+        else:
+            pass
+    
     values = []
     
     for i in range(lines):
         addr = start_val + (i * 4)
-        val_word = manager.cpu.dmem.read(addr)
-        values.append(hex32(val_word.value))
+        
+        if mem_source is not None:
+            addr_hex = hex32(addr)
+            val_hex = mem_source.get(addr_hex, "00000000")
+            values.append(val_hex)
+        else:
+            val_word = manager.cpu.dmem.read(addr)
+            values.append(hex32(val_word.value))
         
     return MemoryPageResponse(
         start_addr=hex32(start_val),
