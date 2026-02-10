@@ -21,8 +21,8 @@ const MemoryView: React.FC<Props> = ({ cycle, writtenAddresses = [] }) => {
       if (!addr.startsWith('0x')) {
           addr = '0x' + addr;
         }
-      // Fetch 48 words (12 rows * 4 columns)
-      const res = await getMemoryPage(addr, 48, cycle);
+      // Fetch 32 words (8 rows * 4 columns)
+      const res = await getMemoryPage(addr, 32, cycle);
       setData(res);
     } catch (err) {
       console.error(err);
@@ -57,7 +57,7 @@ const MemoryView: React.FC<Props> = ({ cycle, writtenAddresses = [] }) => {
       <div className="bg-slate-50 px-3 py-1.5 border-b border-gray-200 font-semibold text-slate-700 flex justify-between items-center text-sm">
         <span>Memory</span>
         <div className="flex gap-2 items-center">
-            <button onClick={() => navigate(-192)} className="px-2 py-0.5 bg-white border border-gray-300 rounded text-xs hover:bg-gray-50 text-slate-600 transition-colors">Prev</button>
+            <button onClick={() => navigate(-128)} className="px-2 py-0.5 bg-white border border-gray-300 rounded text-xs hover:bg-gray-50 text-slate-600 transition-colors">Prev</button>
             <div className="relative">
                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-mono">@</span>
                 <input 
@@ -67,7 +67,7 @@ const MemoryView: React.FC<Props> = ({ cycle, writtenAddresses = [] }) => {
                     placeholder="0x00000000"
                 />
             </div>
-            <button onClick={() => navigate(192)} className="px-2 py-0.5 bg-white border border-gray-300 rounded text-xs hover:bg-gray-50 text-slate-600 transition-colors">Next</button>
+            <button onClick={() => navigate(128)} className="px-2 py-0.5 bg-white border border-gray-300 rounded text-xs hover:bg-gray-50 text-slate-600 transition-colors">Next</button>
         </div>
       </div>
       
@@ -83,7 +83,7 @@ const MemoryView: React.FC<Props> = ({ cycle, writtenAddresses = [] }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 font-mono text-xs">
-            {data && Array.from({ length: 12 }).map((_, rowIdx) => {
+            {data && Array.from({ length: 8 }).map((_, rowIdx) => {
                 const rowStartAddr = parseInt(data.start_addr, 16) + (rowIdx * 16);
                 const rowValues = data.values.slice(rowIdx * 4, (rowIdx + 1) * 4);
                 

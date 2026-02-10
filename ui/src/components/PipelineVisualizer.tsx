@@ -131,8 +131,8 @@ const PipelineVisualizer: React.FC<Props> = ({ snapshot }) => {
                               className="drop-shadow-md opacity-90 transition-all duration-500 ease-in-out"
                               strokeDasharray="5,0"
                           />
-                          {/* Label for register */}
-                          <g transform={`translate(${controlX}, ${controlY + 10})`}> {/* Move label closer to line */}
+                          {/* Label for register - positioned on the line near start */}
+                          <g transform={`translate(${controlX}, ${controlY})`}> 
                             <rect 
                                 x="-14" 
                                 y="-10" 
