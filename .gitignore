@@ -10,6 +10,8 @@
 !pyproject.toml
 !README.md
 !.gitignore
+!ui/
+!ui/**
 **/__pycache__/**
 **/.mypy_cache/**
 **/__pycache__
