@@ -88,19 +88,13 @@ const PipelineVisualizer: React.FC<Props> = ({ snapshot }) => {
               {snapshot.events.forwarding.map((fwd, i) => {
                   const start = getStageCenter(fwd.from_stage);
                   const end = getStageCenter(fwd.to_stage);
-                  
-                  // Adjust Y to avoid overlap
-                  // Use a larger arc for farther distances
                   const dist = Math.abs(start.x - end.x);
                   const direction = start.x < end.x ? 1 : -1;
                   
-                  // Start/End points
-                  const startY = start.y + 20; 
-                  const endY = end.y + 20;
-                  
-                  // Control point for quadratic bezier (above the line)
-                  // Go up (negative Y)
-                  const controlY = Math.min(startY, endY) - (dist * 0.3) - 40 - (i * 20);
+                  // Start/End points - positioned at bottom stage labels
+                  const startY = dimensions.height - 25; // Near bottom black label
+                  const endY = dimensions.height - 25;
+                  const controlY = startY - (dist * 0.25) - 60 - (i * 20);
                   const controlX = (start.x + end.x) / 2;
 
                   let color = '#94a3b8'; // Default slate
@@ -120,6 +114,11 @@ const PipelineVisualizer: React.FC<Props> = ({ snapshot }) => {
 
                   const pathData = `M ${start.x} ${startY} Q ${controlX} ${controlY} ${end.x} ${endY}`;
 
+                  const t = 0.4 + (i % 4) * 0.08;
+                  const labelX = (1-t)*(1-t) * start.x + 2*(1-t)*t * controlX + t*t * end.x;
+                  const labelY = (1-t)*(1-t) * startY + 2*(1-t)*t * controlY + t*t * endY;
+                  const labelYOffset = -18 - (i * 8); // 8px vertical spacing
+
                   return (
                       <g key={i}>
                           <path 
@@ -131,8 +130,8 @@ const PipelineVisualizer: React.FC<Props> = ({ snapshot }) => {
                               className="drop-shadow-md opacity-90 transition-all duration-500 ease-in-out"
                               strokeDasharray="5,0"
                           />
-                          {/* Label for register - positioned on the line near start */}
-                          <g transform={`translate(${controlX}, ${controlY})`}> 
+                          {/* Label for register - positioned on the actual curve with anti-overlap offset */}
+                          <g transform={`translate(${labelX}, ${labelY + labelYOffset})`}> 
                             <rect 
                                 x="-14" 
                                 y="-10" 
