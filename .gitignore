@@ -12,6 +12,7 @@
 !.gitignore
 !ui/
 !ui/**
+!run_server.py
 **/__pycache__/**
 **/.mypy_cache/**
 **/__pycache__
