@@ -74,7 +74,6 @@ next_outer:
 end_sort:
     # Done
     ori $v0, $0, 10
-    syscall
 `;
 
 function App() {
@@ -115,7 +114,9 @@ function App() {
         }
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to load');
+      // Extract detailed error message from axios response
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to load';
+      setError(errorMsg);
       console.error(err);
     } finally {
       setLoading(false);
@@ -128,7 +129,8 @@ function App() {
       const snap = await stepCycle();
       setSnapshot(snap);
     } catch (err: any) {
-      setError(err.message || 'Failed to step');
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to step';
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -140,7 +142,8 @@ function App() {
         const snap = await stepBack();
         setSnapshot(snap);
     } catch (err: any) {
-        setError(err.message);
+        const errorMsg = err.response?.data?.detail || err.message;
+        setError(errorMsg);
     } finally {
         setLoading(false);
     }
@@ -152,7 +155,8 @@ function App() {
         const snap = await continueExec();
         setSnapshot(snap);
     } catch (err: any) {
-        setError(err.message);
+        const errorMsg = err.response?.data?.detail || err.message;
+        setError(errorMsg);
     } finally {
         setLoading(false);
     }
@@ -166,7 +170,8 @@ function App() {
         setSnapshot(snaps[snaps.length - 1]);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to run');
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to run';
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -179,7 +184,8 @@ function App() {
       const snap = await getSnapshot(0);
       setSnapshot(snap);
     } catch (err: any) {
-      setError(err.message);
+      const errorMsg = err.response?.data?.detail || err.message;
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -216,7 +222,8 @@ function App() {
             setError(`PC ${pc} not found in execution history`);
         }
     } catch (err: any) {
-        setError(err.message);
+        const errorMsg = err.response?.data?.detail || err.message;
+        setError(errorMsg);
     } finally {
         setLoading(false);
     }

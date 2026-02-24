@@ -17,7 +17,11 @@ def instr(
     funct: Optional[int] = None,
     tuse_rs: Stage = Stage.BEGIN, # default not use register rs
     tuse_rt: Stage = Stage.BEGIN, # default not use register rt
-    tnew: Stage = Stage.END # default not write register
+    tnew: Stage = Stage.END, # default not write register
+    asm_type: str = None,  # Instruction type: R/I/B/J
+    asm_template: str = None,  # Assembly template e.g., "add $rd, $rs, $rt"
+    asm_encoding: str = None,  # Binary encoding pattern
+    asm_mnemonic: str = None  # Instruction mnemonic for assembler
 ):
     def wrapper(cls):
         key = (opcode, funct) if opcode == 0 else (opcode, None)
@@ -25,6 +29,13 @@ def instr(
         cls._meta_tuse_rs = tuse_rs
         cls._meta_tuse_rt = tuse_rt
         cls._meta_tnew = tnew
+        
+        # Add assembler metadata
+        cls._asm_type = asm_type
+        cls._asm_template = asm_template
+        cls._asm_encoding = asm_encoding
+        cls._asm_mnemonic = asm_mnemonic or cls.__name__.lower()
+        
         return cls
     return wrapper
 

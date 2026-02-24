@@ -4,6 +4,9 @@ import os
 from pathlib import Path
 from typing import List, Dict, Tuple
 
+# Import our own MIPS assembler
+from ..mips import assemble as mips_assemble
+
 try:
     MARS_JAR_PATH = (Path(__file__).resolve().parent.parent / "resource" / "mars.jar").as_posix()
 except NameError:
@@ -56,16 +59,15 @@ def assemble_with_mars(asm_source: str) -> List[int]:
         if tmp_out_path and os.path.exists(tmp_out_path):
             os.unlink(tmp_out_path)
 
-def get_source_map(asm_source: str) -> Dict[str, int]:
+def get_source_map(asm_source: str, start_address: int = 0x00003000) -> Dict[str, int]:
     """
     A simple parser to create a PC-to-line-number map.
-    This does NOT need to understand all instructions, just labels and lines.
     """
     source_map = {}
     labels = {}
     lines = asm_source.splitlines()
     
-    current_pc = 0x3000
+    current_pc = start_address
     for line in lines:
         line = line.split("#")[0].strip()
         if not line:
@@ -78,7 +80,8 @@ def get_source_map(asm_source: str) -> Dict[str, int]:
                  current_pc += 4
         else:
             current_pc += 4
-    current_pc = 0x3000
+    
+    current_pc = start_address
     for line_num, line_content in enumerate(lines, 1):
         line = line_content.split("#")[0].strip()
         if not line:
@@ -98,10 +101,13 @@ def get_source_map(asm_source: str) -> Dict[str, int]:
             
     return source_map
 
-def assemble(asm_source: str) -> Tuple[List[int], Dict[str, int]]:
+def assemble(asm_source: str, start_address: int = 0x00003000) -> Tuple[List[int], Dict[str, int]]:
     """
-    The main assembly function using the hybrid approach.
+    The main assembly function using our native MIPS assembler.
     """
-    machine_codes = assemble_with_mars(asm_source)
-    source_map = get_source_map(asm_source)
+    machine_codes = mips_assemble(asm_source, start_address=start_address)
+    
+    # Generate source map
+    source_map = get_source_map(asm_source, start_address=start_address)
+    
     return machine_codes, source_map
