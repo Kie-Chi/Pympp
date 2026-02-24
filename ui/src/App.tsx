@@ -323,6 +323,7 @@ function App() {
                     <GraduationCap size={18} />
                 </button>
             </div>
+            <ConfigPanel className="ml-1" />
         </div>
         {error && (
             <div className="text-red-600 text-sm font-medium bg-red-50 px-4 py-1.5 rounded-full border border-red-200 animate-pulse shadow-sm flex items-center gap-2">
@@ -388,9 +389,6 @@ function App() {
           </div>
 
       </main>
-      
-      {/* Configuration Panel */}
-      <ConfigPanel />
       
       {/* Instruction Reference Modal */}
       <InstructionReference isOpen={showInstrRef} onClose={() => setShowInstrRef(false)} />

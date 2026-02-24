@@ -34,19 +34,19 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ className = '' }) => {
   };
 
   return (
-    <div className={`fixed top-4 right-4 z-50 ${className}`}>
+    <div className={`relative ${className}`}>
       {/* 切换按钮 */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="bg-slate-700 text-white p-3 rounded-full shadow-lg hover:bg-slate-600 transition-colors"
+        className="cursor-pointer p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
         title="Configuration Settings"
       >
-        <Settings size={20} />
+        <Settings size={18} />
       </button>
 
       {/* 配置面板 */}
       {isOpen && (
-        <div className="absolute top-16 right-0 bg-white border border-gray-200 rounded-lg shadow-xl p-4 w-80">
+        <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-xl p-4 w-80 z-50">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-semibold text-slate-700">Configuration Presets</h3>
             <button
