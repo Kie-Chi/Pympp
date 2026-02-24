@@ -31,9 +31,12 @@ class StageStatus(Behavior):
     """pipeline status"""
     name: str          # IF, ID, etc.
     instr: str         # "add $1, $2, $3"
+    render_str: str = ""  # Rendered instruction string with annotations
     rs: int = 0
     rt: int = 0
     rd: int = 0
+    wreg: Optional[int] = None  # Write register
+    rregs: List[int] = field(default_factory=list)  # Read registers
     imm: int = 0
     tuse_rs: int = -1 # tuse_remaining
     tuse_rt: int = -1 # tuse_remaining

@@ -9,8 +9,19 @@ class ChangeSchema(BaseModel):
 class PipelineStageSchema(BaseModel):
     pc: str
     instr: str
+    render_str: str = ""  # Rendered instruction with annotations
     is_bubble: bool
     is_stall: bool = False
+    # Register information
+    rs: int = 0
+    rt: int = 0
+    rd: int = 0
+    wreg: Optional[int] = None  # Write register
+    rregs: List[int] = []  # Read registers list
+    # Timing information
+    tuse_rs: int = -1  # Remaining cycles until rs is needed
+    tuse_rt: int = -1  # Remaining cycles until rt is needed
+    tnew: int = -1  # Remaining cycles until result is ready
 
 class RegisterSchema(BaseModel):
     name: str

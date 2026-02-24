@@ -1,8 +1,19 @@
 export interface PipelineStage {
   pc: string;
   instr: string;
+  render_str?: string;  // Rendered instruction with annotations
   is_bubble: boolean;
   is_stall: boolean;
+  // Register information
+  rs?: number;
+  rt?: number;
+  rd?: number;
+  wreg?: number | null;  // Write register
+  rregs?: number[];  // Read registers list
+  // Timing information
+  tuse_rs?: number;  // Remaining cycles until rs is needed
+  tuse_rt?: number;  // Remaining cycles until rt is needed
+  tnew?: number;  // Remaining cycles until result is ready
 }
 
 export interface Register {

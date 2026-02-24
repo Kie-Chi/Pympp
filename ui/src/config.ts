@@ -17,6 +17,7 @@ export interface AppConfig {
     showMemory: boolean;             // 是否显示内存
     enableForwardingVisualization: boolean;  // 是否显示 forwarding 线条
     enableChangeVisualization: boolean;      // 是否显示数值变化动画
+    showRegisterTimingDetail: boolean;       // 是否显示寄存器详细时序信息（detail 模式）
   };
   debug: {
     showPCInput: boolean;            // 是否显示 PC 输入框
@@ -44,6 +45,7 @@ export const defaultConfig: AppConfig = {
     showMemory: true,
     enableForwardingVisualization: true,
     enableChangeVisualization: true,
+    showRegisterTimingDetail: false,  // 默认不显示详细时序
   },
   debug: {
     showPCInput: true,
@@ -71,7 +73,8 @@ export const demoConfig: AppConfig = {
     showRegisters: true,
     showMemory: true,
     enableForwardingVisualization: false,    
-    enableChangeVisualization: false,        // 禁用变化动画  
+    enableChangeVisualization: false,        // 禁用变化动画
+    showRegisterTimingDetail: false,
   },
   debug: {
     showPCInput: false,              // 隐藏 PC 输入

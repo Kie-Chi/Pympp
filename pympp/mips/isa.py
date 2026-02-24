@@ -135,9 +135,25 @@ class Instruction(ABC):
 
     @abstractmethod
     def get_wreg(self) -> Optional[int]: pass
+    
+    def get_rregs(self) -> List[int]:
+        """Return list of read registers (excluding $0)"""
+        regs = []
+        if self._tuse_rs != Stage.BEGIN and self.rs != 0:
+            regs.append(self.rs)
+        if self._tuse_rt != Stage.BEGIN and self.rt != 0:
+            regs.append(self.rt)
+        return regs
 
     @abstractmethod
     def disassemble(self, pc: int = None) -> str: pass
+    
+    def render_str(self, pc: int = None) -> str:
+        """
+        Return disassembled string with register annotations.
+        Format: instruction with markers like $t0:w (write) or $t1:r (read)
+        """
+        return self.disassemble(pc)
 
     # Must be implemented  
     @abstractmethod

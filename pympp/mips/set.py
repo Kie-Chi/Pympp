@@ -25,6 +25,9 @@ class Add(Instruction):
     def disassemble(self, pc: int = None) -> str:
         return f"add ${self.rd}, ${self.rs}, ${self.rt}"
 
+    def render_str(self, pc: int = None):
+        return f"add ${self.rd}|w, ${self.rs}|r, ${self.rt}|r"
+
     def execute(self, packet: Packet):
         if packet.stage != Stage.EX:
             return
@@ -39,6 +42,9 @@ class Sub(Instruction):
     
     def disassemble(self, pc: int = None) -> str:
         return f"sub ${self.rd}, ${self.rs}, ${self.rt}"
+    
+    def render_str(self, pc: int = None):
+        return f"sub ${self.rd}|w, ${self.rs}|r, ${self.rt}|r"
 
     def execute(self, packet: Packet):
         if packet.stage != Stage.EX:
@@ -55,6 +61,9 @@ class Lui(Instruction):
     def disassemble(self, pc: int = None) -> str:
         return f"lui ${self.rt}, {hex(self.imm16)}"
 
+    def render_str(self, pc: int = None):
+        return f"lui ${self.rt}|w, {hex(self.imm16)}"
+
     def execute(self, packet: Packet):
         if packet.stage != Stage.EX:
             return
@@ -68,6 +77,9 @@ class Ori(Instruction):
     
     def disassemble(self, pc: int = None) -> str:
         return f"ori ${self.rt}, ${self.rs}, {hex(self.imm16)}"
+    
+    def render_str(self, pc: int = None):
+        return f"ori ${self.rt}|w, ${self.rs}|r, {hex(self.imm16)}"
 
     def execute(self, packet: Packet):
         if packet.stage != Stage.EX:
@@ -84,6 +96,9 @@ class Lw(Instruction):
 
     def disassemble(self, pc: int = None) -> str:
         return f"lw ${self.rt}, {self.imm16_signed}(${self.rs})"
+
+    def render_str(self, pc: int = None):
+        return f"lw ${self.rt}|w, {self.imm16_signed}(${self.rs}|r)"
 
     def execute(self, packet: Packet):
         if packet.stage == Stage.EX:
@@ -102,6 +117,9 @@ class Sw(Instruction):
 
     def disassemble(self, pc: int = None) -> str:
         return f"sw ${self.rt}, {self.imm16_signed}(${self.rs})"
+
+    def render_str(self, pc: int = None):
+        return f"sw ${self.rt}|r, {self.imm16_signed}(${self.rs}|r)"
 
     def execute(self, packet: Packet):
         if packet.stage == Stage.EX:
@@ -123,6 +141,9 @@ class Beq(Instruction):
     def disassemble(self, pc: int = None) -> str:
         return f"beq ${self.rs}, ${self.rt}, {self.imm16_signed}"
 
+    def render_str(self, pc: int = None):
+        return f"beq ${self.rs}|r, ${self.rt}|r, {self.imm16_signed}"
+
     def execute(self, packet: Packet):
         if packet.stage != Stage.ID:
             return
@@ -138,6 +159,9 @@ class Jr(Instruction):
 
     def disassemble(self, pc: int = None) -> str:
         return f"jr ${self.rs}"
+    
+    def render_str(self, pc: int = None):
+        return f"jr ${self.rs}|r"
 
     def execute(self, packet: Packet):
         if packet.stage != Stage.ID:
@@ -156,6 +180,13 @@ class Jal(Instruction):
             target_addr = (self.imm26 << 2) | ((pc + 4) & 0xF0000000)
             return f"jal {hex32(target_addr)}"
         return f"jal {hex32(self.imm26)}"
+    
+    def render_str(self, pc: int = None) -> str:
+        # $ra ($31) is implicitly written
+        if pc is not None:
+            target_addr = (self.imm26 << 2) | ((pc + 4) & 0xF0000000)
+            return f"jal {hex32(target_addr)} (=$31|w)"
+        return f"jal {hex32(self.imm26)} (=$31|w)"
 
     def execute(self, packet: Packet):
         if packet.stage == Stage.ID:

@@ -13,6 +13,40 @@ const STAGE_INDEX: Record<string, number> = {
     'IF': 0, 'ID': 1, 'EX': 2, 'MEM': 3, 'WB': 4
 };
 
+// Parse instruction string with |w (write) and |r (read) markers
+// Returns array of parts with color information
+const parseInstructionWithMarkers = (instr: string) => {
+  // Split by register patterns with markers ($NUM|w or $NUM|r)
+  const regex = /(\$\d+)\|(w|r)/g;
+  const parts: Array<{ text: string; color?: 'red' | 'green' }> = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(instr)) !== null) {
+    // Add text before this match
+    if (match.index > lastIndex) {
+      parts.push({ text: instr.substring(lastIndex, match.index) });
+    }
+    
+    // Add the register with color
+    const registerNum = match[1]; // e.g., "$10"
+    const marker = match[2]; // "w" or "r"
+    parts.push({
+      text: registerNum,
+      color: marker === 'w' ? 'red' : 'green'
+    });
+    
+    lastIndex = regex.lastIndex;
+  }
+  
+  // Add remaining text
+  if (lastIndex < instr.length) {
+    parts.push({ text: instr.substring(lastIndex) });
+  }
+  
+  return parts;
+};
+
 const PipelineVisualizer: React.FC<Props> = ({ snapshot }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -203,8 +237,73 @@ const PipelineVisualizer: React.FC<Props> = ({ snapshot }) => {
                                 <div className={`text-xs font-bold break-words w-full px-1 py-1 rounded bg-white/40
                                     ${isStall ? 'text-red-700' : isBubble ? 'text-amber-700' : 'text-blue-700'}
                                 `}>
-                                    {info.instr}
+                                    {(() => {
+                                        const instrText = info.render_str || info.instr;
+                                        const parts = parseInstructionWithMarkers(instrText);
+                                        return parts.map((part, idx) => (
+                                            <span 
+                                                key={idx}
+                                                className={
+                                                    part.color === 'red' 
+                                                        ? 'text-red-600 font-bold' 
+                                                        : part.color === 'green'
+                                                        ? 'text-green-600 font-bold'
+                                                        : ''
+                                                }
+                                            >
+                                                {part.text}
+                                            </span>
+                                        ));
+                                    })()}
                                 </div>
+                                
+                                {/* Register Information - only show for non-bubble instructions */}
+                                {!isBubble && info.wreg !== undefined && info.wreg !== null && (
+                                    <div className="text-[9px] font-mono text-red-600 bg-red-50 px-1 py-0.5 rounded border border-red-200 w-full truncate">
+                                        W: ${info.wreg}
+                                        {appConfig.ui.showRegisterTimingDetail ? (
+                                            // Detail mode: show tnew value
+                                            info.tnew !== undefined && info.tnew >= 0 && (
+                                                <span className="ml-1 text-red-700 font-semibold">tnew={info.tnew}</span>
+                                            )
+                                        ) : (
+                                            // Simple mode: show cycles remaining
+                                            info.tnew !== undefined && info.tnew > 0 && (
+                                                <span className="ml-1 text-red-700">({info.tnew} cyc)</span>
+                                            )
+                                        )}
+                                    </div>
+                                )}
+                                {!isBubble && info.rregs && info.rregs.length > 0 && (
+                                    <>
+                                        {info.rregs.map((r, i) => {
+                                            // Determine tuse value for this register
+                                            let tuse = -1;
+                                            if (info.rs === r && info.tuse_rs !== undefined) {
+                                                tuse = info.tuse_rs;
+                                            } else if (info.rt === r && info.tuse_rt !== undefined) {
+                                                tuse = info.tuse_rt;
+                                            }
+                                            
+                                            return (
+                                                <div key={i} className="text-[9px] font-mono text-green-600 bg-green-50 px-1 py-0.5 rounded border border-green-200 w-full truncate">
+                                                    R: ${r}
+                                                    {appConfig.ui.showRegisterTimingDetail ? (
+                                                        // Detail mode: show tuse value
+                                                        tuse >= 0 && (
+                                                            <span className="ml-1 text-green-700 font-semibold">tuse={tuse}</span>
+                                                        )
+                                                    ) : (
+                                                        // Simple mode: show cycles remaining
+                                                        tuse > 0 && (
+                                                            <span className="ml-1 text-green-700">({tuse} cyc)</span>
+                                                        )
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </>
+                                )}
                                 
                                 {/* Flags */}
                                 <div className="flex flex-col gap-1 mt-auto mb-4 w-full px-2">

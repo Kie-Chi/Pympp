@@ -132,8 +132,17 @@ def _to_snapshot_schema(snap: Dict[str, Any], outofbound: bool = False) -> Snaps
             pipeline_data[stage_name] = PipelineStageSchema(
                 pc=stage_info["pc"],
                 instr=stage_info["instr"],
+                render_str=stage_info.get("render_str", stage_info["instr"]),
                 is_bubble=stage_info["is_bubble"],
-                is_stall=stage_info["is_stall"]
+                is_stall=stage_info["is_stall"],
+                rs=stage_info.get("rs", 0),
+                rt=stage_info.get("rt", 0),
+                rd=stage_info.get("rd", 0),
+                wreg=stage_info.get("wreg"),
+                rregs=stage_info.get("rregs", []),
+                tuse_rs=stage_info.get("tuse_rs", -1),
+                tuse_rt=stage_info.get("tuse_rt", -1),
+                tnew=stage_info.get("tnew", -1)
             )
         else:
             pipeline_data[stage_name] = None
