@@ -85,6 +85,7 @@ function App() {
   const [isAssembled, setIsAssembled] = useState(false);
   const [showInstrRef, setShowInstrRef] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
+  const [detailMode, setDetailMode] = useState(appConfig.ui.showRegisterTimingDetail);
 
   const refreshState = useCallback(async (snap?: Snapshot) => {
     try {
@@ -367,6 +368,11 @@ function App() {
                     isAssembled={isAssembled}
                     outofbound={snapshot?.outofbound || false}
                     trigger={snapshot}
+                    detailMode={detailMode}
+                    onDetailModeChange={(mode) => {
+                      setDetailMode(mode);
+                      appConfig.ui.showRegisterTimingDetail = mode;
+                    }}
                 />
             </div>
           </div>
@@ -374,7 +380,7 @@ function App() {
           {/* Middle Column: Pipeline Visualization & Memory */}
           <div className="flex flex-col gap-4 min-h-0 h-full">
             <div className="h-[60%] min-h-[300px] flex-shrink-0">
-                <PipelineVisualizer snapshot={snapshot} />
+                <PipelineVisualizer snapshot={snapshot} detailMode={detailMode} />
             </div>
             <div className="flex-1 min-h-0">
                 <MemoryView 

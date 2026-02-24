@@ -4,6 +4,7 @@ import { appConfig } from '../config';
 
 interface Props {
   snapshot: Snapshot | null;
+  detailMode?: boolean;
 }
 
 const STAGES = ['IF', 'ID', 'EX', 'MEM', 'WB'];
@@ -47,7 +48,7 @@ const parseInstructionWithMarkers = (instr: string) => {
   return parts;
 };
 
-const PipelineVisualizer: React.FC<Props> = ({ snapshot }) => {
+const PipelineVisualizer: React.FC<Props> = ({ snapshot, detailMode = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
@@ -261,7 +262,7 @@ const PipelineVisualizer: React.FC<Props> = ({ snapshot }) => {
                                 {!isBubble && info.wreg !== undefined && info.wreg !== null && (
                                     <div className="text-[9px] font-mono text-red-600 bg-red-50 px-1 py-0.5 rounded border border-red-200 w-full truncate">
                                         W: ${info.wreg}
-                                        {appConfig.ui.showRegisterTimingDetail ? (
+                                        {detailMode ? (
                                             // Detail mode: show tnew value
                                             info.tnew !== undefined && info.tnew >= 0 && (
                                                 <span className="ml-1 text-red-700 font-semibold">tnew={info.tnew}</span>
@@ -288,7 +289,7 @@ const PipelineVisualizer: React.FC<Props> = ({ snapshot }) => {
                                             return (
                                                 <div key={i} className="text-[9px] font-mono text-green-600 bg-green-50 px-1 py-0.5 rounded border border-green-200 w-full truncate">
                                                     R: ${r}
-                                                    {appConfig.ui.showRegisterTimingDetail ? (
+                                                    {detailMode ? (
                                                         // Detail mode: show tuse value
                                                         tuse >= 0 && (
                                                             <span className="ml-1 text-green-700 font-semibold">tuse={tuse}</span>

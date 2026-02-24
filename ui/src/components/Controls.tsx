@@ -16,15 +16,17 @@ interface Props {
   isAssembled: boolean;
   outofbound?: boolean;
   trigger?: any;
+  detailMode?: boolean;
+  onDetailModeChange?: (mode: boolean) => void;
 }
 
 const Controls: React.FC<Props> = ({ 
-  onAssemble, onStep, onStepBack, onRun, onContinue, onStop, onJumpCycle, onJumpPc, loading, cycle, isAssembled, outofbound, trigger 
+  onAssemble, onStep, onStepBack, onRun, onContinue, onStop, onJumpCycle, onJumpPc, loading, cycle, isAssembled, outofbound, trigger,
+  detailMode = false, onDetailModeChange
 }) => {
   const [targetCycle, setTargetCycle] = useState<string>('');
   const [targetPc, setTargetPc] = useState<string>('');
   const [sliderValue, setSliderValue] = useState<number>(cycle);
-  const [detailMode, setDetailMode] = useState(false);
 
   // Sync slider with cycle prop
   useEffect(() => {
@@ -137,8 +139,12 @@ const Controls: React.FC<Props> = ({
         
         <div className="w-px h-6 bg-gray-200 mx-1"></div>
         <button
-            onClick={() => setDetailMode(!detailMode)}
-            title="Detail Mode"
+            onClick={() => {
+              if (onDetailModeChange) {
+                onDetailModeChange(!detailMode);
+              }
+            }}
+            title={detailMode ? "Detail Mode: Showing tuse/tnew values" : "Simple Mode: Showing remaining cycles"}
             className={`p-2 rounded-md transition-colors ${detailMode ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:text-slate-600'}`}
         >
              {detailMode ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}

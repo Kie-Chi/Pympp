@@ -89,30 +89,6 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ className = '' }) => {
             </button>
           </div>
 
-          {/* Quick Toggle for Register Timing Detail */}
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <label className="flex items-center justify-between cursor-pointer">
-              <span className="text-sm text-slate-700 font-medium">Register Timing Detail Mode</span>
-              <input
-                type="checkbox"
-                checked={appConfig.ui.showRegisterTimingDetail}
-                onChange={(e) => {
-                  appConfig.ui.showRegisterTimingDetail = e.target.checked;
-                  setCurrentPreset('custom');
-                  // Force re-render
-                  setIsOpen(false);
-                  setTimeout(() => setIsOpen(true), 0);
-                }}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-              />
-            </label>
-            <div className="text-xs text-slate-500 mt-1">
-              {appConfig.ui.showRegisterTimingDetail 
-                ? "Showing tuse/tnew values (Detail Mode)" 
-                : "Showing remaining cycles (Simple Mode)"}
-            </div>
-          </div>
-
           {/* 当前配置状态 */}
           <div className="mt-4 pt-4 border-t border-gray-200">
             <div className="text-xs text-slate-600 space-y-1">
@@ -151,12 +127,6 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ className = '' }) => {
                 <span>Change Animation:</span>
                 <span className={appConfig.ui.enableChangeVisualization ? 'text-green-600' : 'text-red-600'}>
                   {appConfig.ui.enableChangeVisualization ? '✓ Enabled' : '✗ Disabled'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Register Timing Detail:</span>
-                <span className={appConfig.ui.showRegisterTimingDetail ? 'text-green-600' : 'text-red-600'}>
-                  {appConfig.ui.showRegisterTimingDetail ? '✓ Detail Mode' : '✗ Simple Mode'}
                 </span>
               </div>
               <div className="flex justify-between">
