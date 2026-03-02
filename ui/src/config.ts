@@ -54,17 +54,16 @@ export const defaultConfig: AppConfig = {
   },
 };
 
-// 2026春节配置:)，留下一些功能假装没有实现
 export const demoConfig: AppConfig = {
   editor: {
-    enableFullscreen: false,         // 禁用全屏
-    enableEditing: false,            // 禁止编辑
+    enableFullscreen: true,         // 禁用全屏
+    enableEditing: true,            // 禁止编辑
   },
   controls: {
     enableStep: true,    
-    enableStepBack: false,           // 禁用回退    
-    enableRun: false,
-    enableContinue: false,
+    enableStepBack: true,           // 禁用回退    
+    enableRun: true,
+    enableContinue: true,
     enablePause: true,
     enableReset: false,              // 禁用重置
   },
@@ -72,14 +71,14 @@ export const demoConfig: AppConfig = {
     showPipeline: true,
     showRegisters: true,
     showMemory: true,
-    enableForwardingVisualization: false,    
-    enableChangeVisualization: false,        // 禁用变化动画
+    enableForwardingVisualization: true,    
+    enableChangeVisualization: true,        // 禁用变化动画
     showRegisterTimingDetail: false,
   },
   debug: {
-    showPCInput: false,              // 隐藏 PC 输入
-    enableManualPC: false,           // 禁止手动设置 PC
-    enableCycleSlider: false,        // 禁止使用 cycle 滑块
+    showPCInput: true,              // 隐藏 PC 输入
+    enableManualPC: true,           // 禁止手动设置 PC
+    enableCycleSlider: true,        // 禁止使用 cycle 滑块
   },
 };
 
