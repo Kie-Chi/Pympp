@@ -11,8 +11,25 @@ const getSessionId = () => {
   return sessionId;
 };
 
+// 根据环境配置 API 地址
+const getApiBaseUrl = () => {
+  // 生产环境下，如果是通过域名访问，使用同源 API
+  if (import.meta.env.PROD) {
+    // 如果设置了环境变量 VITE_API_BASE_URL，使用它
+    if (import.meta.env.VITE_API_BASE_URL) {
+      return import.meta.env.VITE_API_BASE_URL;
+    }
+    // 否则使用当前域名的 8000 端口
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    return `${protocol}//${hostname}:8000`;
+  }
+  // 开发环境使用代理
+  return '/api';
+};
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: getApiBaseUrl(),
 });
 
 // Add interceptor to include Session ID in all requests

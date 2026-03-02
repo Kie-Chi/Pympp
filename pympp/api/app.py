@@ -1,5 +1,6 @@
 from venv import logger
 from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from ..cpu import CPU
@@ -17,6 +18,21 @@ import time
 
 app = FastAPI(title="MIPS Pipeline Simulator API v2.0")
 logger = get_logger(__name__)
+
+# Configure CORS for external access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://mobile.fl0wer.cn",
+        "https://mobile.fl0wer.cn",
+        "*"  # 允许所有来源，生产环境中可以限制具体域名
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Register name mapping
 REG_NAMES = [
