@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Settings } from 'lucide-react';
-import { appConfig, defaultConfig, demoConfig, AppConfig } from '../config';
+import { appConfig, defaultConfig, demoConfig } from '../config';
 
 interface ConfigPanelProps {
   className?: string;

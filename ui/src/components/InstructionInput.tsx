@@ -82,7 +82,7 @@ const InstructionInput: React.FC<Props> = ({ asmSource, setAsmSource, currentLin
                     padding: '8px' // Match textarea padding
                 }}
             >
-                {lines.map((line, i) => (
+                {lines.map((_, i) => (
                     <div key={i} className={`w-full h-6 ${currentLine === i + 1 ? 'bg-yellow-200/90 -mx-2 px-2 border-l-4 border-yellow-500 shadow-sm' : ''}`}>
                          {/* Empty content, just for background */}
                     </div>

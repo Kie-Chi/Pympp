@@ -1,6 +1,6 @@
 import { appConfig } from './config';
-import { useState, useEffect, useCallback } from 'react';
-import { loadProgram, stepCycle, stepBack, continueExec, runUntilEnd, resetSimulator, getSnapshot, getSourceMap, findCycleByPc, getCurrentCycle } from './api/client';
+import { useState, useEffect } from 'react';
+import { loadProgram, stepCycle, stepBack, continueExec, runUntilEnd, resetSimulator, getSnapshot, getSourceMap, findCycleByPc } from './api/client';
 import { Snapshot } from './types/schema';
 import InstructionInput from './components/InstructionInput';
 import Controls from './components/Controls';
@@ -87,17 +87,6 @@ function App() {
   const [showQuiz, setShowQuiz] = useState(false);
   const [detailMode, setDetailMode] = useState(appConfig.ui.showRegisterTimingDetail);
 
-  const refreshState = useCallback(async (snap?: Snapshot) => {
-    try {
-      if (snap) {
-        setSnapshot(snap);
-      } else {
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
-
   const handleLoad = async () => {
     setLoading(true);
     setError(null);
@@ -172,20 +161,6 @@ function App() {
       }
     } catch (err: any) {
       const errorMsg = err.response?.data?.detail || err.message || 'Failed to run';
-      setError(errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleReset = async () => {
-    setLoading(true);
-    try {
-      await resetSimulator();
-      const snap = await getSnapshot(0);
-      setSnapshot(snap);
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.detail || err.message;
       setError(errorMsg);
     } finally {
       setLoading(false);

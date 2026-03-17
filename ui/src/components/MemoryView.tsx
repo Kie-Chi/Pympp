@@ -112,7 +112,6 @@ const MemoryView: React.FC<Props> = ({ cycle, writtenAddresses = [], memoryChang
                         </td>
                         {rowValues.map((val, colIdx) => {
                             const addr = rowStartAddr + (colIdx * 4);
-                            const addrHex = `0x${addr.toString(16).padStart(8, '0')}`;
                             const normalized = normalizeAddr(addr);
                             const isWritten = writtenAddresses.some(wa => normalizeAddr(wa) === normalized);
                             const isAnimating = animatingAddresses.has(normalized);

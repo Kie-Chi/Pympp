@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wrench, Play, SkipForward, RotateCcw, Square, ArrowRight, StepBack, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Wrench, Play, SkipForward, Square, ArrowRight, StepBack, ToggleLeft, ToggleRight } from 'lucide-react';
 import { appConfig } from '../config';
 
 interface Props {
@@ -24,7 +24,6 @@ const Controls: React.FC<Props> = ({
   onAssemble, onStep, onStepBack, onRun, onContinue, onStop, onJumpCycle, onJumpPc, loading, cycle, isAssembled, outofbound, trigger,
   detailMode = false, onDetailModeChange
 }) => {
-  const [targetCycle, setTargetCycle] = useState<string>('');
   const [targetPc, setTargetPc] = useState<string>('');
   const [sliderValue, setSliderValue] = useState<number>(cycle);
 
@@ -60,13 +59,6 @@ const Controls: React.FC<Props> = ({
       let val = parseInt(e.target.value);
       // Optional: Visual clamp if we know max?
       setSliderValue(val);
-  };
-
-  const handleSliderCommit = () => {
-      if (!appConfig.debug.enableCycleSlider) return; // Prevent jump if disabled
-      if (sliderValue !== cycle) {
-          onJumpCycle(sliderValue);
-      }
   };
 
   return (

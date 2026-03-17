@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, XCircle, RefreshCw, Trophy, FileText, Maximize2, Minimize2 } from 'lucide-react';
-import { getFile } from '../api/client'; // Assuming we'll add this
 
 interface Instruction {
   name: string;
