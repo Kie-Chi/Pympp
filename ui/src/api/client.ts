@@ -13,16 +13,12 @@ const getSessionId = () => {
 
 // 根据环境配置 API 地址
 const getApiBaseUrl = () => {
-  // 生产环境下，如果是通过域名访问，使用同源 API
+  // 生产环境优先使用环境变量；默认走同源 /api（由反向代理转发到后端）
   if (import.meta.env.PROD) {
-    // 如果设置了环境变量 VITE_API_BASE_URL，使用它
     if (import.meta.env.VITE_API_BASE_URL) {
       return import.meta.env.VITE_API_BASE_URL;
     }
-    // 否则使用当前域名的 8000 端口
-    const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
-    return `${protocol}//${hostname}:8000`;
+    return '/api';
   }
   // 开发环境使用代理
   return '/api';

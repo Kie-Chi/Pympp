@@ -13,6 +13,9 @@
 !ui/
 !ui/**
 !run_server.py
+!.dockerignore
+!docker-compose.yml
+!Dockerfile
 **/__pycache__/**
 **/.mypy_cache/**
 **/__pycache__

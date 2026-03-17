@@ -7,10 +7,10 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
-    allowedHosts: ['mobile.fl0wer.cn', 'localhost'],
+    allowedHosts: ['nas.fl0wer.cn', 'mobile.fl0wer.cn', 'localhost'],
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:28000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },

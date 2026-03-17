@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Git
+.git/
+.gitignore
+
+# Node / frontend build files
+ui/node_modules/
+ui/dist/
+
+# IDE
+.vscode/
+.DS_Store
