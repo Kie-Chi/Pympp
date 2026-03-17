@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIPS Pipeline Simulator 使用指南</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            color: #333;
+            background-color: #fafafa;
+        }
+        h1 {
+            color: #1a1a1a;
+            border-bottom: 3px solid #4a90d9;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #2c3e50;
+            margin-top: 40px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        h3 {
+            color: #34495e;
+            margin-top: 25px;
+        }
+        h4 {
+            color: #4a5568;
+            margin-top: 20px;
+        }
+        p {
+            margin-bottom: 16px;
+        }
+        ul, ol {
+            padding-left: 24px;
+            margin-bottom: 16px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #4a90d9;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        tr:hover {
+            background-color: #e8f4fd;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #2d3748;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin: 15px 0;
+        }
+        blockquote {
+            border-left: 4px solid #4a90d9;
+            padding-left: 20px;
+            margin: 20px 0;
+            color: #555;
+            background-color: #f0f7ff;
+            padding: 15px 20px;
+            border-radius: 0 8px 8px 0;
+        }
+        hr {
+            border: none;
+            border-top: 2px solid #e0e0e0;
+            margin: 40px 0;
+        }
+        strong {
+            color: #1a1a1a;
+        }
+        .icon {
+            display: inline-block;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <h1>MIPS Pipeline Simulator 使用指南</h1>
+
+    <h2>概览</h2>
+    <p>MIPS Pipeline Simulator 是一个交互式的 MIPS 五级流水线 CPU 模拟器，用于学习和理解流水线处理器的工作原理。模拟器支持：</p>
+    <ul>
+        <li><strong>流水线可视化</strong>：IF、ID、EX、MEM、WB</li>
+        <li><strong>数据转发、暂停可视化</strong>：显示流水线各级之间的数据转发路径/暂停逻辑</li>
+        <li><strong>与Mars相同逻辑的控制</strong>：支持逐周期执行和回退等，方便调试</li>
+        <li><strong>寄存器与内存实时监控</strong>：实时显示寄存器和内存的变化</li>
+    </ul>
+
+    <h3>界面布局</h3>
+    <p>模拟器界面分为以下几个主要区域：</p>
+    <ol>
+        <li><strong>左侧</strong>：代码编辑器 + 控制面板</li>
+        <li><strong>中间</strong>：流水线可视化 + 内存视图</li>
+        <li><strong>右侧</strong>：寄存器视图</li>
+        <li><strong>顶部</strong>：快捷键提示、功能按钮</li>
+    </ol>
+    <p><img src="usage/image.png" alt="界面概览"></p>
+
+    <hr>
+
+    <h2>代码编辑器</h2>
+    <p>代码编辑器用于编写和加载 MIPS 汇编代码。</p>
+
+    <h3>功能说明</h3>
+    <ul>
+        <li><strong>语法高亮</strong>：显示行号，当前执行行高亮</li>
+        <li><strong>当前指令追踪</strong>：正在执行的指令会被黄色高亮标记</li>
+        <li><strong>自动滚动</strong>：当代码执行时，编辑器会自动滚动到当前行</li>
+        <li><strong>全屏模式</strong>：点击右上角的全屏按钮可放大编辑器</li>
+    </ul>
+
+    <h3>使用方法</h3>
+    <ol>
+        <li>在编辑器中输入 MIPS 汇编代码</li>
+        <li>点击控制面板中的 <strong>Assemble</strong> <img class="icon" src="usage/image-8.png" alt="Assemble"> 按钮(或F6)进行汇编</li>
+        <li>汇编成功后，编辑器将锁定（只读），当前指令行会被高亮</li>
+        <li>执行过程中，编辑器会自动跟踪当前执行的指令</li>
+    </ol>
+
+    <h3>示例代码</h3>
+    <p>编辑器默认包含一个冒泡排序的实现示例：</p>
+    <pre><code># Bubble Sort Implementation
+# Initialize array in memory
+ori $t0, $0, 5          # Array length
+sw $t0, 0($0)           # Store length at 0x0
+
+ori $t1, $0, 10
+sw $t1, 4($0)           # arr[0] = 10
+# ... more initialization
+
+outer_loop:
+    # Bubble sort logic
+    # ...</code></pre>
+
+    <h3>键盘快捷键</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>快捷键</th>
+                <th>功能</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>F6</td>
+                <td>汇编/加载代码</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <hr>
+
+    <h2>控制面板</h2>
+    <p>控制面板提供模拟器的执行控制功能。</p>
+    <p><img src="usage/image-4.png" alt="控制面板"></p>
+
+    <h3>按钮功能</h3>
+
+    <h4>汇编前</h4>
+    <table>
+        <thead>
+            <tr>
+                <th>按钮</th>
+                <th>快捷键</th>
+                <th>说明</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Assemble</strong> <img class="icon" src="usage/image-8.png" alt="Assemble"></td>
+                <td>F6</td>
+                <td>汇编当前代码并初始化模拟器</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4>汇编后</h4>
+    <table>
+        <thead>
+            <tr>
+                <th>按钮</th>
+                <th>快捷键</th>
+                <th>说明</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Step Back</strong> <img class="icon" src="usage/image-9.png" alt="Step Back"></td>
+                <td>F11</td>
+                <td>回退到上一个时钟周期</td>
+            </tr>
+            <tr>
+                <td><strong>Step Forward</strong> <img class="icon" src="usage/image-10.png" alt="Step Forward"></td>
+                <td>F10</td>
+                <td>前进一个时钟周期</td>
+            </tr>
+            <tr>
+                <td><strong>Continue</strong> <img class="icon" src="usage/image-11.png" alt="Continue"></td>
+                <td>F5</td>
+                <td>跳转到本次模拟已执行的最远位置</td>
+            </tr>
+            <tr>
+                <td><strong>Run</strong> <img class="icon" src="usage/image-12.png" alt="Run"></td>
+                <td>-</td>
+                <td>连续运行直到程序结束</td>
+            </tr>
+            <tr>
+                <td><strong>Stop</strong> <img class="icon" src="usage/image-13.png" alt="Stop"></td>
+                <td>Esc</td>
+                <td>停止执行，重置状态</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <blockquote>
+        <p>注：Continue按钮使用：当使用 Step Back 回退查看之前的周期，或使用周期滑块跳转到历史周期后，点击 Continue 可以快速跳回到模拟器已执行到的最远位置(即当次模拟的"最新"状态)</p>
+    </blockquote>
+
+    <h3>周期导航</h3>
+    <ul>
+        <li><strong>周期滑块</strong>：拖动滑块可以快速跳转到指定的时钟周期</li>
+        <li><strong>周期计数器</strong>：显示当前所处的时钟周期数</li>
+    </ul>
+
+    <h3>显示模式切换</h3>
+    <p>控制面板右侧有一个模式切换按钮<img class="icon" src="usage/image-14.png" alt="Mode Switch">/<img class="icon" src="usage/image-15.png" alt="Mode Switch">：</p>
+    <ul>
+        <li><strong>简单模式</strong>：显示剩余周期数</li>
+        <li><strong>详细模式</strong>：用于深入理解流水线时序</li>
+    </ul>
+
+    <hr>
+
+    <h2>流水线</h2>
+    <p>流水线可视化区域展示五级流水线的当前状态，是理解流水线工作原理的核心区域。</p>
+    <p><img src="usage/image-5.png" alt="流水线可视化"></p>
+
+    <h3>五级流水线阶段</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>阶段</th>
+                <th>名称</th>
+                <th>功能</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>IF</strong></td>
+                <td>Instruction Fetch</td>
+                <td>从内存读取指令</td>
+            </tr>
+            <tr>
+                <td><strong>ID</strong></td>
+                <td>Instruction Decode</td>
+                <td>解析指令，读取寄存器</td>
+            </tr>
+            <tr>
+                <td><strong>EX</strong></td>
+                <td>Execute</td>
+                <td>ALU 运算或地址计算</td>
+            </tr>
+            <tr>
+                <td><strong>MEM</strong></td>
+                <td>Memory Access</td>
+                <td>读取或写入内存</td>
+            </tr>
+            <tr>
+                <td><strong>WB</strong></td>
+                <td>Write Back</td>
+                <td>将结果写入寄存器</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>流水线阶段显示内容</h3>
+    <p>每个流水线阶段显示以下信息：</p>
+    <ol>
+        <li><strong>PC 地址</strong>：当前指令的 PC 值（顶部小字）</li>
+        <li><strong>指令内容</strong>：当前执行的指令（中间大字）</li>
+        <li><strong>写寄存器 (W)</strong>：该指令将要写入的寄存器（红色标记）</li>
+        <li><strong>读寄存器 (R)</strong>：该指令需要读取的寄存器（绿色标记）</li>
+        <li><strong>状态标记</strong>：
+            <ul>
+                <li><strong>STALL</strong>：流水线暂停（红色背景）</li>
+                <li><strong>BUBBLE</strong>：流水线气泡（黄色背景）</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h3>数据转发可视化</h3>
+    <p>模拟器会自动显示数据转发路径，使用不同颜色的曲线表示：</p>
+    <table>
+        <thead>
+            <tr>
+                <th>颜色</th>
+                <th>转发目标</th>
+                <th>说明</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>蓝色</strong></td>
+                <td>→ ID</td>
+                <td>转发到译码阶段</td>
+            </tr>
+            <tr>
+                <td><strong>黄色</strong></td>
+                <td>→ EX</td>
+                <td>转发到执行阶段</td>
+            </tr>
+            <tr>
+                <td><strong>绿色</strong></td>
+                <td>→ MEM</td>
+                <td>转发到访存阶段</td>
+            </tr>
+        </tbody>
+    </table>
+    <p>转发线上会标注被转发的寄存器编号</p>
+    <p><img src="usage/image-16.png" alt="Forwarding" style="width: 200px;"></p>
+
+    <h3>冒险处理说明</h3>
+    <p>模拟器自动处理以下数据冒险：</p>
+    <ol>
+        <li><strong>RAW冒险</strong>：
+            <ul>
+                <li>通过数据转发解决大部分 RAW 冒险</li>
+                <li>Load-Use 冒险会触发 STALL</li>
+            </ul>
+        </li>
+        <li><strong>控制冒险</strong>：
+            <ul>
+                <li>分支指令会在 ID 阶段判断跳转条件</li>
+                <li>使用延迟槽技术</li>
+            </ul>
+        </li>
+    </ol>
+
+    <hr>
+
+    <h2>内存与寄存器视图</h2>
+
+    <h3>寄存器视图</h3>
+    <p>寄存器视图显示所有 32 个通用寄存器（GPR）的当前值。</p>
+    <p><img src="usage/image-7.png" alt="寄存器视图"></p>
+
+    <h4>寄存器列表</h4>
+    <table>
+        <thead>
+            <tr>
+                <th>编号</th>
+                <th>名称</th>
+                <th>用途</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>$0</td>
+                <td>$zero</td>
+                <td>常量 0</td>
+            </tr>
+            <tr>
+                <td>$1</td>
+                <td>$at</td>
+                <td>汇编器临时寄存器</td>
+            </tr>
+            <tr>
+                <td>$2-$3</td>
+                <td>$v0-$v1</td>
+                <td>函数返回值</td>
+            </tr>
+            <tr>
+                <td>$4-$7</td>
+                <td>$a0-$a3</td>
+                <td>函数参数</td>
+            </tr>
+            <tr>
+                <td>$8-$15</td>
+                <td>$t0-$t7</td>
+                <td>临时寄存器</td>
+            </tr>
+            <tr>
+                <td>$16-$23</td>
+                <td>$s0-$s7</td>
+                <td>保存寄存器</td>
+            </tr>
+            <tr>
+                <td>$24-$25</td>
+                <td>$t8-$t9</td>
+                <td>更多临时寄存器</td>
+            </tr>
+            <tr>
+                <td>$26-$27</td>
+                <td>$k0-$k1</td>
+                <td>内核保留</td>
+            </tr>
+            <tr>
+                <td>$28</td>
+                <td>$gp</td>
+                <td>全局指针</td>
+            </tr>
+            <tr>
+                <td>$29</td>
+                <td>$sp</td>
+                <td>栈指针</td>
+            </tr>
+            <tr>
+                <td>$30</td>
+                <td>$fp</td>
+                <td>帧指针</td>
+            </tr>
+            <tr>
+                <td>$31</td>
+                <td>$ra</td>
+                <td>返回地址</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4>显示说明</h4>
+    <ul>
+        <li><strong>红色背景</strong>：该寄存器在本周期被写入</li>
+        <li><strong>变化动画</strong>：显示值从旧值变为新值的过程</li>
+        <li><strong>自动滚动</strong>：当寄存器被写入时，视图会自动滚动到该寄存器</li>
+    </ul>
+
+    <h3>内存视图</h3>
+    <p>内存视图显示内存中的数据内容，以十六进制格式呈现。</p>
+    <p><img src="usage/image-6.png" alt="内存视图"></p>
+
+    <h4>功能说明</h4>
+    <ol>
+        <li><strong>地址导航</strong>：
+            <ul>
+                <li>在地址输入框中输入起始地址（十六进制）</li>
+                <li>点击 <strong>Prev</strong> 向前翻页（-128 字节）</li>
+                <li>点击 <strong>Next</strong> 向后翻页（+128 字节）</li>
+            </ul>
+        </li>
+        <li><strong>数据显示</strong>：
+            <ul>
+                <li>每行显示 4 个字</li>
+                <li>格式：地址 | +0 | +4 | +8 | +c</li>
+            </ul>
+        </li>
+        <li><strong>变化标记</strong>：
+            <ul>
+                <li><strong>红色背景</strong>：该内存位置在本周期被写入</li>
+                <li><strong>变化动画</strong>：显示值从旧值变为新值的过程</li>
+            </ul>
+        </li>
+    </ol>
+
+    <hr>
+
+    <h2>扩展功能</h2>
+
+    <h3>指令参考手册</h3>
+    <p>点击顶部的书本图标<img class="icon" src="usage/image-17.png" alt="Instruction Reference">可打开指令参考手册，包含：</p>
+    <ol>
+        <li><strong>Tuse / Tnew 概念解释</strong>：
+            <ul>
+                <li><strong>Tuse</strong>：源操作数被使用的时刻（距离当前还需多少周期）
+                    <ul>
+                        <li>Tuse = 0：在 D 阶段使用</li>
+                        <li>Tuse = 1：在 E 阶段使用</li>
+                        <li>Tuse = 2：在 M 阶段使用</li>
+                    </ul>
+                </li>
+                <li><strong>Tnew</strong>：结果产生的时刻（结果在哪个阶段准备好）
+                    <ul>
+                        <li>Tnew = E：在 E 阶段产生</li>
+                        <li>Tnew = M：在 M 阶段产生</li>
+                        <li>Tnew = W：在 W 阶段产生</li>
+                    </ul>
+                </li>
+            </ul>
+        </li>
+        <li><strong>支持的指令列表</strong>：
+            <ul>
+                <li>算术指令：add, sub, addi 等</li>
+                <li>逻辑指令：ori, and, or, lui 等</li>
+                <li>访存指令：lw, sw 等</li>
+                <li>分支跳转指令：beq, bne, j, jal, jr 等</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h3>Quiz模式</h3>
+    <p>点击顶部的学士帽图标<img class="icon" src="usage/image-18.png" alt="Quiz Mode">可进入测验模式，用于测试对 Tuse/Tnew 的理解：</p>
+    <ol>
+        <li>系统会随机显示指令</li>
+        <li>用户需要选择正确的 Tuse(rs)、Tuse(rt) 和 Tnew 值</li>
+        <li>答对得分，答错显示正确答案</li>
+        <li>完成所有题目后显示总分</li>
+    </ol>
+
+    <hr>
+
+    <h2>使用流程</h2>
+    <ol>
+        <li><strong>编写代码</strong>：在编辑器中输入 MIPS 汇编代码</li>
+        <li><strong>汇编加载</strong>：点击 Assemble 按钮或按 F6</li>
+        <li><strong>单步执行</strong>：使用 Step Forward 按钮或按 F10 逐周期执行</li>
+        <li><strong>观察流水线</strong>：观察各级流水线的变化和数据转发</li>
+        <li><strong>检查状态</strong>：查看寄存器和内存的变化</li>
+        <li><strong>回退调试</strong>：使用 Step Back 按钮或按 F11 回退分析</li>
+        <li><strong>快速定位</strong>：使用周期滑块或 PC 跳转快速定位到特定时刻</li>
+    </ol>
+
+    <hr>
+    <p style="text-align: center; color: #888;">MIPS Pipeline Simulator</p>
+</body>
+</html>
