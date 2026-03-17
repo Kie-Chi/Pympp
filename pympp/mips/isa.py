@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from struct import pack
-from tkinter import Pack
 from typing import Optional, Dict, Any, Type, List
 from pydantic import BaseModel
 
