@@ -117,7 +117,20 @@
         .icon {
             display: inline-block;
             vertical-align: middle;
+            width: 20px;
+            height: 20px;
         }
+        .icon-sm {
+            width: 16px;
+            height: 16px;
+        }
+        .icon-blue { color: #2563eb; }
+        .icon-green { color: #16a34a; }
+        .icon-indigo { color: #4f46e5; }
+        .icon-purple { color: #9333ea; }
+        .icon-red { color: #dc2626; }
+        .icon-slate { color: #64748b; }
+        .icon-orange { color: #ea580c; }
     </style>
 </head>
 <body>
@@ -158,7 +171,11 @@
     <h3>使用方法</h3>
     <ol>
         <li>在编辑器中输入 MIPS 汇编代码</li>
-        <li>点击控制面板中的 <strong>Assemble</strong> <img class="icon" src="usage/image-8.png" alt="Assemble"> 按钮(或F6)进行汇编</li>
+        <li>点击控制面板中的 <strong>Assemble</strong>
+            <svg class="icon icon-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+            </svg>
+            按钮(或F6)进行汇编</li>
         <li>汇编成功后，编辑器将锁定（只读），当前指令行会被高亮</li>
         <li>执行过程中，编辑器会自动跟踪当前执行的指令</li>
     </ol>
@@ -213,7 +230,11 @@ outer_loop:
         </thead>
         <tbody>
             <tr>
-                <td><strong>Assemble</strong> <img class="icon" src="usage/image-8.png" alt="Assemble"></td>
+                <td><strong>Assemble</strong>
+                    <svg class="icon icon-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                    </svg>
+                </td>
                 <td>F6</td>
                 <td>汇编当前代码并初始化模拟器</td>
             </tr>
@@ -231,27 +252,52 @@ outer_loop:
         </thead>
         <tbody>
             <tr>
-                <td><strong>Step Back</strong> <img class="icon" src="usage/image-9.png" alt="Step Back"></td>
+                <td><strong>Step Back</strong>
+                    <svg class="icon icon-slate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="5" x2="19" y2="19"/>
+                        <polygon points="15 4 5 12 15 20 15 4"/>
+                    </svg>
+                </td>
                 <td>F11</td>
                 <td>回退到上一个时钟周期</td>
             </tr>
             <tr>
-                <td><strong>Step Forward</strong> <img class="icon" src="usage/image-10.png" alt="Step Forward"></td>
+                <td><strong>Step Forward</strong>
+                    <span style="position: relative; display: inline-block;">
+                        <svg class="icon icon-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        <span style="position: absolute; right: -4px; bottom: -4px; font-size: 8px; font-weight: bold; background: white; border-radius: 50%; padding: 0 3px; border: 1px solid #16a34a; line-height: 1; color: #16a34a;">1</span>
+                    </span>
+                </td>
                 <td>F10</td>
                 <td>前进一个时钟周期</td>
             </tr>
             <tr>
-                <td><strong>Continue</strong> <img class="icon" src="usage/image-11.png" alt="Continue"></td>
+                <td><strong>Continue</strong>
+                    <svg class="icon icon-indigo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="5 4 15 12 5 20 5 4"/>
+                        <line x1="19" y1="5" x2="19" y2="19"/>
+                    </svg>
+                </td>
                 <td>F5</td>
                 <td>跳转到本次模拟已执行的最远位置</td>
             </tr>
             <tr>
-                <td><strong>Run</strong> <img class="icon" src="usage/image-12.png" alt="Run"></td>
+                <td><strong>Run</strong>
+                    <svg class="icon icon-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                </td>
                 <td>-</td>
                 <td>连续运行直到程序结束</td>
             </tr>
             <tr>
-                <td><strong>Stop</strong> <img class="icon" src="usage/image-13.png" alt="Stop"></td>
+                <td><strong>Stop</strong>
+                    <svg class="icon icon-red" style="transform: scale(0.75);" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect width="14" height="14" x="5" y="5" rx="2"/>
+                    </svg>
+                </td>
                 <td>Esc</td>
                 <td>停止执行，重置状态</td>
             </tr>
@@ -269,7 +315,16 @@ outer_loop:
     </ul>
 
     <h3>显示模式切换</h3>
-    <p>控制面板右侧有一个模式切换按钮<img class="icon" src="usage/image-14.png" alt="Mode Switch">/<img class="icon" src="usage/image-15.png" alt="Mode Switch">：</p>
+    <p>控制面板右侧有一个模式切换按钮
+        <svg class="icon icon-slate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="16" height="10" x="2" y="7" rx="2"/>
+        </svg>
+        /
+        <svg class="icon icon-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="16" height="10" x="2" y="7" rx="2"/>
+            <circle cx="16" cy="12" r="2"/>
+        </svg>
+        ：</p>
     <ul>
         <li><strong>简单模式</strong>：显示剩余周期数</li>
         <li><strong>详细模式</strong>：用于深入理解流水线时序</li>
@@ -388,8 +443,6 @@ outer_loop:
 
     <h3>寄存器视图</h3>
     <p>寄存器视图显示所有 32 个通用寄存器（GPR）的当前值。</p>
-    <p><img src="usage/image-7.png" alt="寄存器视图"></p>
-
     <h4>寄存器列表</h4>
     <table>
         <thead>
@@ -502,7 +555,12 @@ outer_loop:
     <h2>扩展功能</h2>
 
     <h3>指令参考手册</h3>
-    <p>点击顶部的书本图标<img class="icon" src="usage/image-17.png" alt="Instruction Reference">可打开指令参考手册，包含：</p>
+    <p>点击顶部的书本图标
+        <svg class="icon icon-slate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+        </svg>
+        可打开指令参考手册，包含：</p>
     <ol>
         <li><strong>Tuse / Tnew 概念解释</strong>：
             <ul>
@@ -533,7 +591,12 @@ outer_loop:
     </ol>
 
     <h3>Quiz模式</h3>
-    <p>点击顶部的学士帽图标<img class="icon" src="usage/image-18.png" alt="Quiz Mode">可进入测验模式，用于测试对 Tuse/Tnew 的理解：</p>
+    <p>点击顶部的学士帽图标
+        <svg class="icon icon-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+            <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+        </svg>
+        可进入测验模式，用于测试对 Tuse/Tnew 的理解：</p>
     <ol>
         <li>系统会随机显示指令</li>
         <li>用户需要选择正确的 Tuse(rs)、Tuse(rt) 和 Tnew 值</li>
