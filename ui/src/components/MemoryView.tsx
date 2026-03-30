@@ -8,6 +8,7 @@ interface Props {
   memory?: Record<string, string>; // Optional direct memory from snapshot if needed, though we use paged fetch
   writtenAddresses?: string[];
   memoryChanges?: Record<string, { origin: string; new: string; reason: string }>;
+  textSegment?: { start: number; end: number } | null; // Text segment range for read-only display
 }
 
 // Helper to normalize hex addresses for comparison
@@ -16,7 +17,7 @@ const normalizeAddr = (addr: string | number) => {
     return s.padStart(8, '0').toLowerCase();
 };
 
-const MemoryView: React.FC<Props> = ({ cycle, writtenAddresses = [], memoryChanges = {} }) => {
+const MemoryView: React.FC<Props> = ({ cycle, writtenAddresses = [], memoryChanges = {}, textSegment }) => {
   const [startAddr, setStartAddr] = useState<string>('0x00000000');
   const [data, setData] = useState<MemoryPageResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -118,12 +119,17 @@ const MemoryView: React.FC<Props> = ({ cycle, writtenAddresses = [], memoryChang
                             const changeKey = Object.keys(memoryChanges).find(k => normalizeAddr(k) === normalized);
                             const change = changeKey ? memoryChanges[changeKey] : undefined;
                             const showChange = appConfig.ui.enableChangeVisualization && change && isAnimating;
-                            
+
+                            // Check if this address is in text segment (read-only)
+                            const isTextSegment = textSegment && addr >= textSegment.start && addr < textSegment.end;
+
                             return (
                                 <td key={colIdx} className={`px-2 py-1 border-r border-gray-100 last:border-r-0 overflow-hidden whitespace-nowrap
-                                    ${isWritten 
-                                        ? 'bg-red-100 font-bold text-red-700' 
-                                        : 'text-slate-700'}
+                                    ${isTextSegment
+                                        ? 'bg-gray-100 text-gray-500 italic'
+                                        : isWritten
+                                            ? 'bg-red-100 font-bold text-red-700'
+                                            : 'text-slate-700'}
                                 `}>
                                     {showChange ? (
                                       <div className="flex flex-row items-center gap-1">

@@ -96,8 +96,8 @@ export const getCurrentCycle = async (): Promise<CycleInfo> => {
   return res.data;
 };
 
-export const getSourceMap = async (): Promise<Record<string, number>> => {
-  const res = await api.get<Record<string, number>>('/get_source_map');
+export const getSourceMap = async (): Promise<{ source_map: Record<string, number>; text_start: string; text_end: string }> => {
+  const res = await api.get<{ source_map: Record<string, number>; text_start: string; text_end: string }>('/get_source_map');
   return res.data;
 };
 

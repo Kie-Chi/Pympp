@@ -81,6 +81,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [asmSource, setAsmSource] = useState(DEFAULT_ASM);
   const [sourceMap, setSourceMap] = useState<Record<string, number>>({});
+  const [textSegment, setTextSegment] = useState<{ start: number; end: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isAssembled, setIsAssembled] = useState(false);
   const [showInstrRef, setShowInstrRef] = useState(false);
@@ -92,8 +93,13 @@ function App() {
     setError(null);
     try {
       await loadProgram(asmSource);
-      const map = await getSourceMap();
-      setSourceMap(map);
+      const mapRes = await getSourceMap();
+      setSourceMap(mapRes.source_map);
+      // Parse text segment range
+      const textStart = parseInt(mapRes.text_start, 16);
+      const textEnd = parseInt(mapRes.text_end, 16);
+      setTextSegment({ start: textStart, end: textEnd });
+
       const res = await resetSimulator();
       if (res.success) {
         setIsAssembled(true);
@@ -358,11 +364,12 @@ function App() {
                 <PipelineVisualizer snapshot={snapshot} detailMode={detailMode} />
             </div>
             <div className="flex-1 min-h-0">
-                <MemoryView 
-                    memory={snapshot?.memory} 
-                    cycle={snapshot?.cycle || 0} 
+                <MemoryView
+                    memory={snapshot?.memory}
+                    cycle={snapshot?.cycle || 0}
                     writtenAddresses={snapshot?.events?.memory_written}
                     memoryChanges={snapshot?.events?.memory_changes}
+                    textSegment={textSegment}
                 />
             </div>
           </div>

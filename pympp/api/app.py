@@ -286,7 +286,13 @@ def load_program(req: LoadRequest, manager: Simulator = Depends(get_simulator)):
 @app.get("/get_source_map")
 def get_source_map(manager: Simulator = Depends(get_simulator)):
     manager.ensure_cpu()
-    return manager.source_map
+    text_start = 0x3000
+    text_end = text_start + len(manager.cpu.imem) * 4
+    return {
+        "source_map": manager.source_map,
+        "text_start": hex32(text_start),
+        "text_end": hex32(text_end)
+    }
 
 @app.post("/step_cycle", response_model=SnapshotSchema)
 def step_cycle(manager: Simulator = Depends(get_simulator)):

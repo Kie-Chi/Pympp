@@ -68,17 +68,38 @@ class Memory:
 
     def read(self, addr: int) -> Word:
         val = self.data.get(int(addr), 0)
+
+        # Check if address is in text segment (code)
+        if self.is_text_segment(addr):
+            # Return instruction from imem
+            idx = (addr - 0x3000) // 4
+            if 0 <= idx < len(self.cpu.imem):
+                return Word(self.cpu.imem[idx])
+
         return to_word(val)
-    
+
     def get(self, addr, default=0):
         return self.data.get(addr, default)
 
     def copy(self):
         return self.data.copy()
 
+    def is_text_segment(self, addr: int) -> bool:
+        """检查地址是否在代码段范围内"""
+        TEXT_START = 0x3000
+        TEXT_END = TEXT_START + len(self.cpu.imem) * 4
+        return TEXT_START <= addr < TEXT_END
+
     def write(self, addr: int, change, pc: int):
         data = change.new
         iaddr = int(addr)
+
+        if self.is_text_segment(iaddr):
+            self.cpu.log_behavior(MemWriteBehavior(
+                self.cpu.cycle, pc, iaddr, data.value,
+                origin=change.origin.value, reason="text_segment_write_blocked"
+            ))
+            return
         self.data[iaddr] = data
         self.cpu.log_behavior(MemWriteBehavior(
             self.cpu.cycle, pc, iaddr, data.value,
