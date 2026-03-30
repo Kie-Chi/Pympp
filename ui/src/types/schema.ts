@@ -4,6 +4,7 @@ export interface PipelineStage {
   render_str?: string;  // Rendered instruction with annotations
   is_bubble: boolean;
   is_stall: boolean;
+  is_stall_src?: boolean;  // Is Stall Src Stage
   // Register information
   rs?: number;
   rt?: number;

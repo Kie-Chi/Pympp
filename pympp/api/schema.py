@@ -12,6 +12,7 @@ class PipelineStageSchema(BaseModel):
     render_str: str = ""  # Rendered instruction with annotations
     is_bubble: bool
     is_stall: bool = False
+    is_stall_src: bool = False  # 是否是阻塞源
     # Register information
     rs: int = 0
     rt: int = 0

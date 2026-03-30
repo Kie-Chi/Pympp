@@ -201,16 +201,18 @@ const PipelineVisualizer: React.FC<Props> = ({ snapshot, detailMode = false }) =
                             const info = snapshot.pipeline[stage as keyof typeof snapshot.pipeline];
                             const isStall = info?.is_stall;
                             const isBubble = info?.is_bubble;
+                            const isStallSrc = info?.is_stall_src;
 
                             return (
                                 <div key={stage} className="flex flex-col h-full relative group">
                                     <div className={`flex-1 rounded-t-lg border-x border-t shadow-sm transition-all duration-300 relative flex flex-col min-w-0
                     ${isStall
-                                            ? 'bg-red-50 border-red-200'
+                                            ? 'bg-red-50 border-red-200 animate-pulse'
                                             : isBubble
                                                 ? 'bg-amber-50 border-amber-200'
                                                 : 'bg-blue-50 border-blue-200'
                                         }
+                    ${isStallSrc ? 'border-2 border-red-500' : ''}
                 `}>
                                         <div className="p-1 flex flex-col gap-2 items-center text-center mt-8 w-full">
                                             {info ? (
@@ -285,7 +287,7 @@ const PipelineVisualizer: React.FC<Props> = ({ snapshot, detailMode = false }) =
 
                                                     <div className="flex flex-col gap-1 mt-auto mb-4 w-full px-2">
                                                         {isStall && (
-                                                            <div className="flex items-center justify-center gap-1 bg-red-100 text-red-700 px-2 py-1 rounded border border-red-200 shadow-sm animate-pulse">
+                                                            <div className="flex items-center justify-center gap-1 bg-red-100 text-red-700 px-2 py-1 rounded border border-red-200 shadow-sm">
                                                                 <span className="text-xs font-bold uppercase tracking-wider">STALL</span>
                                                             </div>
                                                         )}

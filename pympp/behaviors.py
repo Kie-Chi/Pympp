@@ -43,6 +43,7 @@ class StageStatus(Behavior):
     tnew: int = -1 # tnew_remaining
     is_bubble: bool = False
     is_stall: bool = False
+    is_stall_src: bool = False  # 是否是阻塞源
 
     def __str__(self):
         if self.is_bubble:

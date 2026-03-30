@@ -151,6 +151,7 @@ def _to_snapshot_schema(snap: Dict[str, Any], outofbound: bool = False) -> Snaps
                 render_str=stage_info.get("render_str", stage_info["instr"]),
                 is_bubble=stage_info["is_bubble"],
                 is_stall=stage_info["is_stall"],
+                is_stall_src=stage_info.get("is_stall_src", False),
                 rs=stage_info.get("rs", 0),
                 rt=stage_info.get("rt", 0),
                 rd=stage_info.get("rd", 0),

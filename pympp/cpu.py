@@ -185,6 +185,12 @@ class CPU:
 
     def capture_snapshot(self, cur_pc: int):
         pipeline_snap = {}
+
+        stall_srcs = set()
+        for b in self.current_behaviors:
+            if isinstance(b, StallBehavior):
+                stall_srcs.add(b.producer_stage)
+
         s = Stage.IF
         while s != Stage.END:
             p = self.shadows[s]
@@ -196,6 +202,7 @@ class CPU:
                         if isinstance(b, StallBehavior) and b.consumer_stage == "ID":
                             is_stall = True
                             break
+                is_stall_src = s.name in stall_srcs
                 tuse_rs = p.instr.tuse_rs_remaining(s)
                 tuse_rt = p.instr.tuse_rt_remaining(s)
                 tnew = p.instr.tnew_remaining(s)
@@ -217,7 +224,8 @@ class CPU:
                     tuse_rt=tuse_rt,
                     tnew=tnew,
                     is_bubble=is_bubble,
-                    is_stall=is_stall
+                    is_stall=is_stall,
+                    is_stall_src=is_stall_src
                 ).to_dict()
             else:
                 pipeline_snap[s.name] = None
