@@ -79,7 +79,8 @@ class ForwardBehavior(Behavior):
 
     def __str__(self):
         # ID <--($ 5: 0000000a)-- WB
-        return f"{self.to_stage} <--(${self.reg:2d}: {hex32(self.val)})-- {self.from_stage}"
+        # return f"{self.to_stage} <--(${self.reg:2d}: {hex32(self.val)})-- {self.from_stage}"
+        return f"{self.to_stage} <--(${self.reg:2d})-- {self.from_stage}"
 
 # @dataclass
 # class MemReadBehavior(Behavior):
@@ -102,13 +103,13 @@ class MemWriteBehavior(Behavior):
 @dataclass
 class StallBehavior(Behavior):
     """stall behavior"""
-    stage: str
-    reason: str
+    producer_stage: str  # stall source
+    consumer_stage: str  # stall dest
+    reg: int             # for which register
 
     def __str__(self):
-        stalled_stage = Stage[self.stage]
-        next_stage_name = PIPELINE[stalled_stage].name if stalled_stage in PIPELINE and PIPELINE[stalled_stage] != Stage.END else "???"
-        return f"{self.stage} ---x--> {next_stage_name}"
+        # EX ---x---> ID ($ 8)
+        return f"{self.producer_stage} ---x---> {self.consumer_stage} ($ {self.reg})"
 
 @dataclass
 class BranchBehavior(Behavior):

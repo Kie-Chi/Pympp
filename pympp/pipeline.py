@@ -24,7 +24,7 @@ class Pool:
                 t_use_val = max(0, t_use.value - Stage.ID.value)
                 
                 if t_use_val < t_new:
-                    raise StallException(f"Hazard on ${reg}: Tuse({t_use_val}) < Tnew({t_new})")
+                    raise StallException(f"Hazard on ${reg}: Tuse({t_use_val}) < Tnew({t_new})", reg, s.name)
                 return # Found the latest producer
 
     def read_reg(self, reg: int, cur_stage: Stage, log: bool = True) -> Word:
@@ -47,7 +47,7 @@ class Pool:
                      t_use = curpkt.instr.tuse_rs if reg == curpkt.instr.rs else curpkt.instr.tuse_rt
                      t_use_val = max(0, t_use.value - Stage.ID.value)
                      if t_use_val < t_new:
-                        raise StallException(f"Hazard on ${reg}: Tuse({t_use_val}) < Tnew({t_new})")
+                        raise StallException(f"Hazard on ${reg}: Tuse({t_use_val}) < Tnew({t_new})", reg, s.name)
 
                 if t_new == 0:
                     # Value must be available if t_new == 0

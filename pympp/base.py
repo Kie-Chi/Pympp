@@ -35,5 +35,7 @@ PIPELINE = {
 }
 
 class StallException(Exception):
-    def __init__(self, reason: str):
+    def __init__(self, reason: str, reg: int = 0, producer_stage: str = ""):
         self.reason = reason
+        self.reg = reg
+        self.producer_stage = producer_stage

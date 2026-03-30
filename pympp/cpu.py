@@ -149,7 +149,12 @@ class CPU:
                 self.slots[Stage.ID] = None
                 
             except StallException as e:
-                self.log_behavior(StallBehavior(self.cycle, p_id.pc, "ID", str(e)))
+                self.log_behavior(StallBehavior(
+                    self.cycle, p_id.pc,
+                    producer_stage=e.producer_stage,
+                    consumer_stage="ID",
+                    reg=e.reg
+                ))
                 bubble_pkt = Packet(pool=self.pool, pc=0, instr=Bubble(0))
                 bubble_pkt.stage = Stage.EX
                 self.slots[Stage.EX] = bubble_pkt
@@ -188,7 +193,7 @@ class CPU:
                 is_stall = False
                 if s == Stage.ID:
                     for b in self.current_behaviors:
-                        if isinstance(b, StallBehavior) and b.stage == "ID":
+                        if isinstance(b, StallBehavior) and b.consumer_stage == "ID":
                             is_stall = True
                             break
                 tuse_rs = p.instr.tuse_rs_remaining(s)
