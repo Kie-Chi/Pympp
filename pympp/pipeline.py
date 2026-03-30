@@ -44,10 +44,19 @@ class Pool:
                 
                 # Double check stall for safety
                 if cur_stage == Stage.ID:
-                     t_use = curpkt.instr.tuse_rs if reg == curpkt.instr.rs else curpkt.instr.tuse_rt
-                     t_use_val = max(0, t_use.value - Stage.ID.value)
-                     if t_use_val < t_new:
-                        raise StallException(f"Hazard on ${reg}: Tuse({t_use_val}) < Tnew({t_new})", reg, s.name)
+                    # Only check stall if the instruction actually reads this register
+                    if reg == curpkt.instr.rs:
+                        t_use = curpkt.instr.tuse_rs
+                    elif reg == curpkt.instr.rt:
+                        t_use = curpkt.instr.tuse_rt
+                    else:
+                        # Instruction doesn't read this register, no stall needed
+                        t_use = Stage.BEGIN
+
+                    if t_use != Stage.BEGIN:
+                        t_use_val = max(0, t_use.value - Stage.ID.value)
+                        if t_use_val < t_new:
+                            raise StallException(f"Hazard on ${reg}: Tuse({t_use_val}) < Tnew({t_new})", reg, s.name)
 
                 if t_new == 0:
                     # Value must be available if t_new == 0
