@@ -45,11 +45,20 @@ class RegisterFile:
 
     def write(self, reg_id: int, change, pc: int):
         data = change.new
+        # ugly
+        # because read_reg will not actually stall pipeline now, so when we use read_reg fetch origin value of a register, it may be old(that in RegisterFile, not new value in pipline), thus the change.origin.value is useless
+        # so we dont use the change.origin.value, but actually read from RegisterFile
         if reg_id != 0:
+            origin_val = self.regs[reg_id].value
             self.regs[reg_id] = data
             self.cpu.log_behavior(RegWriteBehavior(
-                self.cpu.cycle, pc, reg_id, data.value, 
-                origin=change.origin.value, reason=change.reason
+                self.cpu.cycle, 
+                pc, 
+                reg_id, 
+                data.value, 
+                # origin=change.origin.value, error !!!
+                origin=origin_val,
+                reason=change.reason
             ))
 
 class Memory:
