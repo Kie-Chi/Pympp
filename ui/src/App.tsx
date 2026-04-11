@@ -121,18 +121,30 @@ function App() {
 
   // Global config state
   const [globalConfig, setGlobalConfig] = useState<GlobalConfig>(getGlobalConfigState());
+  const [configReady, setConfigReady] = useState(false);
   const featureConfig: FeatureConfig = useMemo(() => globalToFeatureConfig(globalConfig), [globalConfig]);
 
   // Initialize config on mount
   useEffect(() => {
-    initializeConfig();
+    let disposed = false;
+
+    void (async () => {
+      await initializeConfig();
+      if (!disposed) {
+        // Apply fetched config immediately (do not wait for SSE first message)
+        setGlobalConfig(getGlobalConfigState());
+        setConfigReady(true);
+      }
+    })();
 
     // Subscribe to config updates
     const unsubscribe = subscribeConfig((config) => {
       setGlobalConfig(config);
+      setConfigReady(true);
     });
 
     return () => {
+      disposed = true;
       unsubscribe();
       cleanupConfig();
     };
@@ -400,7 +412,7 @@ function App() {
                     <BookOpen size={18} />
                 </button>
             </div>
-            {featureConfig.showQuiz && (
+            {configReady && featureConfig.showQuiz && (
               <div className="relative group ml-1">
                 <button
                   onClick={() => setShowQuiz(true)}
@@ -411,7 +423,7 @@ function App() {
                 </button>
               </div>
             )}
-            {featureConfig.showExercise && (
+            {configReady && featureConfig.showExercise && (
               <div className="relative group ml-1">
                   <button
                       onClick={() => setShowExercise(true)}
@@ -510,18 +522,20 @@ function App() {
       <InstructionReference isOpen={showInstrRef} onClose={() => setShowInstrRef(false)} />
 
       {/* Quiz Mode Modal */}
-      {featureConfig.showQuiz && (
+      {configReady && featureConfig.showQuiz && (
         <QuizMode isOpen={showQuiz} onClose={() => setShowQuiz(false)} />
       )}
 
       {/* Exercise Mode Modal */}
-      <ExerciseMode
-        isOpen={showExercise}
-        onClose={() => setShowExercise(false)}
-        onLoadAsm={handleLoadAsm}
-        showPart1={featureConfig.showExercisePart1}
-        showPart2={featureConfig.showExercisePart2}
-      />
+      {configReady && featureConfig.showExercise && (
+        <ExerciseMode
+          isOpen={showExercise}
+          onClose={() => setShowExercise(false)}
+          onLoadAsm={handleLoadAsm}
+          showPart1={featureConfig.showExercisePart1}
+          showPart2={featureConfig.showExercisePart2}
+        />
+      )}
 
       {/* Admin Panel */}
       <AdminPanel isOpen={showAdmin} onClose={() => setShowAdmin(false)} />
