@@ -10,9 +10,10 @@ from ..base import Stage
 from ..log import get_logger
 from .schema import (
     LoadResponse, ResetResponse, CycleInfo, MemoryPageResponse,
-    SnapshotSchema, PipelineStageSchema, RegisterSchema, 
+    SnapshotSchema, PipelineStageSchema, RegisterSchema,
     EventsSchema, ForwardingSchema, ChangeSchema
 )
+from .quiz import router as quiz_router
 from datetime import datetime, timedelta
 import time
 
@@ -33,6 +34,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register Quiz API router
+app.include_router(quiz_router)
 
 # Register name mapping
 REG_NAMES = [
