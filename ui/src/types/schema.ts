@@ -228,3 +228,46 @@ export interface ExerciseStatsResponse {
   accuracy_rate: number;
   most_wrong_instructions: string[];
 }
+
+// === Global Config Types ===
+
+export interface GlobalConfig {
+  id: number;
+
+  // Feature toggles
+  show_quiz: boolean;
+  show_exercise: boolean;
+  show_exercise_part1: boolean;  // AT Method
+  show_exercise_part2: boolean;  // Strategy Matrix
+
+  // Editor config
+  editor_fullscreen: boolean;
+  editor_editing: boolean;
+
+  // Controls config
+  controls_step: boolean;
+  controls_step_back: boolean;
+  controls_run: boolean;
+  controls_continue: boolean;
+  controls_pause: boolean;
+  controls_reset: boolean;
+
+  // UI config
+  ui_show_pipeline: boolean;
+  ui_show_registers: boolean;
+  ui_show_memory: boolean;
+  ui_forwarding_visualization: boolean;
+  ui_change_visualization: boolean;
+
+  // Debug config
+  debug_pc_input: boolean;
+  debug_manual_pc: boolean;
+  debug_cycle_slider: boolean;
+
+  updated_at: string | null;
+}
+
+export interface AdminStatusResponse {
+  admin_available: boolean;
+  message: string;
+}

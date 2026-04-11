@@ -9,6 +9,7 @@ services:
     restart: unless-stopped
     environment:
       - PYMPP_TYPE=${PYMPP_TYPE:-prod}
+      - AUTH_TOKEN=${AUTH_TOKEN:-iamxxk}
 
   frontend:
     build:

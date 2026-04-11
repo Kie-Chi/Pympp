@@ -4,7 +4,8 @@ import {
   QuizStartResponse, QuizAnswerRequest, QuizAnswerResponse,
   QuizSessionSummary, QuizHistoryResponse, QuizStatsResponse,
   ExerciseStartResponse, ExerciseAnswerRequest, ExerciseAnswerResponse,
-  ExerciseSessionSummary, ExerciseHistoryResponse, ExerciseStatsResponse
+  ExerciseSessionSummary, ExerciseHistoryResponse, ExerciseStatsResponse,
+  GlobalConfig, AdminStatusResponse
 } from '../types/schema';
 
 const generateSessionId = (): string => {
@@ -208,4 +209,39 @@ export const getExerciseAdminStats = async (): Promise<ExerciseStatsResponse> =>
 export const getExerciseAdminRecords = async (limit: number = 100): Promise<any[]> => {
   const res = await api.get<any[]>('/exercise/admin/records', { params: { limit } });
   return res.data;
+};
+
+// === Config APIs ===
+
+export const getGlobalConfig = async (): Promise<GlobalConfig> => {
+  const res = await api.get<GlobalConfig>('/config');
+  return res.data;
+};
+
+export const updateGlobalConfig = async (config: GlobalConfig, authToken: string): Promise<GlobalConfig> => {
+  const res = await api.put<GlobalConfig>('/config', config, {
+    headers: { 'X-Auth-Token': authToken }
+  });
+  return res.data;
+};
+
+export const verifyAuthToken = async (authToken: string): Promise<{ valid: boolean }> => {
+  const res = await api.post<{ valid: boolean }>('/config/verify', null, {
+    headers: { 'X-Auth-Token': authToken }
+  });
+  return res.data;
+};
+
+export const getAdminStatus = async (): Promise<AdminStatusResponse> => {
+  const res = await api.get<AdminStatusResponse>('/config/status');
+  return res.data;
+};
+
+export const createConfigStream = (): EventSource => {
+  // Get API base URL for SSE
+  const baseUrl = import.meta.env.PROD
+    ? (import.meta.env.VITE_API_BASE_URL || '/api')
+    : '/api';
+
+  return new EventSource(`${baseUrl}/config/stream`);
 };

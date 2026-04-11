@@ -17,6 +17,8 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onLoadAsm?: (asmSource: string) => void;  // Callback to load ASM into editor
+  showPart1?: boolean;  // Show AT Method option (from config)
+  showPart2?: boolean;  // Show Strategy Matrix option (from config)
 }
 
 const STAGE_OPTIONS = [
@@ -89,7 +91,7 @@ const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 type ExercisePart = 'AT' | 'Matrix';
 
-const ExerciseMode: React.FC<Props> = ({ isOpen, onClose, onLoadAsm }) => {
+const ExerciseMode: React.FC<Props> = ({ isOpen, onClose, onLoadAsm, showPart1 = true, showPart2 = true }) => {
   // Part selection state
   const [selectedPart, setSelectedPart] = useState<ExercisePart | null>(null);
   const [showPartSelection, setShowPartSelection] = useState(true);
@@ -732,22 +734,26 @@ const ExerciseMode: React.FC<Props> = ({ isOpen, onClose, onLoadAsm }) => {
                 <p className="text-sm text-slate-500 mt-2">Choose which part of the pipeline exercise you want to practice</p>
               </div>
               <div className="grid grid-cols-2 gap-6 max-w-2xl mx-auto">
-                <button
-                  onClick={() => handleSelectPart('AT')}
-                  className="p-8 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 hover:border-blue-400 transition-all text-center"
-                >
-                  <FileText size={40} className="mx-auto text-blue-600 mb-3" />
-                  <div className="text-xl font-bold text-blue-700 mb-1">Part 1</div>
-                  <div className="text-base text-blue-600">AT Method</div>
-                </button>
-                <button
-                  onClick={() => handleSelectPart('Matrix')}
-                  className="p-8 bg-purple-50 border-2 border-purple-200 rounded-lg hover:bg-purple-100 hover:border-purple-400 transition-all text-center"
-                >
-                  <Grid3x3 size={40} className="mx-auto text-purple-600 mb-3" />
-                  <div className="text-xl font-bold text-purple-700 mb-1">Part 2</div>
-                  <div className="text-base text-purple-600">Strategy Matrix</div>
-                </button>
+                {showPart1 && (
+                  <button
+                    onClick={() => handleSelectPart('AT')}
+                    className="p-8 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 hover:border-blue-400 transition-all text-center"
+                  >
+                    <FileText size={40} className="mx-auto text-blue-600 mb-3" />
+                    <div className="text-xl font-bold text-blue-700 mb-1">Part 1</div>
+                    <div className="text-base text-blue-600">AT Method</div>
+                  </button>
+                )}
+                {showPart2 && (
+                  <button
+                    onClick={() => handleSelectPart('Matrix')}
+                    className="p-8 bg-purple-50 border-2 border-purple-200 rounded-lg hover:bg-purple-100 hover:border-purple-400 transition-all text-center"
+                  >
+                    <Grid3x3 size={40} className="mx-auto text-purple-600 mb-3" />
+                    <div className="text-xl font-bold text-purple-700 mb-1">Part 2</div>
+                    <div className="text-base text-purple-600">Strategy Matrix</div>
+                  </button>
+                )}
               </div>
             </div>
           )}

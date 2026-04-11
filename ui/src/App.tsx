@@ -1,14 +1,14 @@
-import { appConfig } from './config';
-import { useState, useEffect } from 'react';
-import { loadProgram, stepCycle, stepBack, continueExec, runUntilEnd, resetSimulator, getSnapshot, getSourceMap, findCycleByPc } from './api/client';
-import { Snapshot } from './types/schema';
+import { appConfig, initializeConfig, subscribeConfig, getGlobalConfigState, cleanupConfig, globalToFeatureConfig, FeatureConfig } from './config';
+import { useState, useEffect, useMemo } from 'react';
+import { loadProgram, stepCycle, stepBack, continueExec, runUntilEnd, resetSimulator, getSnapshot, getSourceMap, findCycleByPc, verifyAuthToken } from './api/client';
+import { Snapshot, GlobalConfig } from './types/schema';
 import InstructionInput from './components/InstructionInput';
 import Controls from './components/Controls';
 import PipelineVisualizer from './components/PipelineVisualizer';
 import RegisterFile from './components/RegisterFile';
 import MemoryView from './components/MemoryView';
 import ConfigPanel from './components/ConfigPanel';
-import { HelpCircle, BookOpen, GraduationCap, Pencil, Users } from 'lucide-react';
+import { HelpCircle, BookOpen, GraduationCap, Pencil, Users, Lock, AlertCircle } from 'lucide-react';
 import InstructionReference from './components/InstructionReference';
 import QuizMode from './components/QuizMode';
 import ExerciseMode from './components/ExerciseMode';
@@ -79,6 +79,65 @@ end_sort:
 `;
 
 function App() {
+  // Admin mode detection (URL parameter ?mode=admin)
+  const isAdmin = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('mode') === 'admin';
+  }, []);
+
+  // Admin authentication state
+  const [adminAuthed, setAdminAuthed] = useState(false);
+  const [showAdminAuth, setShowAdminAuth] = useState(false);
+  const [adminAuthToken, setAdminAuthToken] = useState('');
+  const [adminAuthError, setAdminAuthError] = useState<string | null>(null);
+  const [adminAuthLoading, setAdminAuthLoading] = useState(false);
+
+  // Show auth dialog when entering admin mode
+  useEffect(() => {
+    if (isAdmin && !adminAuthed) {
+      setShowAdminAuth(true);
+    }
+  }, [isAdmin, adminAuthed]);
+
+  // Handle admin auth verification
+  const handleAdminAuth = async () => {
+    if (!adminAuthToken.trim()) {
+      setAdminAuthError('Please enter auth token');
+      return;
+    }
+    setAdminAuthLoading(true);
+    setAdminAuthError(null);
+    try {
+      await verifyAuthToken(adminAuthToken);
+      setAdminAuthed(true);
+      setShowAdminAuth(false);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Invalid auth token';
+      setAdminAuthError(errorMsg);
+    } finally {
+      setAdminAuthLoading(false);
+    }
+  };
+
+  // Global config state
+  const [globalConfig, setGlobalConfig] = useState<GlobalConfig>(getGlobalConfigState());
+  const featureConfig: FeatureConfig = useMemo(() => globalToFeatureConfig(globalConfig), [globalConfig]);
+
+  // Initialize config on mount
+  useEffect(() => {
+    initializeConfig();
+
+    // Subscribe to config updates
+    const unsubscribe = subscribeConfig((config) => {
+      setGlobalConfig(config);
+    });
+
+    return () => {
+      unsubscribe();
+      cleanupConfig();
+    };
+  }, []);
+
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [asmSource, setAsmSource] = useState(DEFAULT_ASM);
@@ -91,6 +150,12 @@ function App() {
   const [showExercise, setShowExercise] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [detailMode, setDetailMode] = useState(appConfig.ui.showRegisterTimingDetail);
+
+  useEffect(() => {
+    if (!featureConfig.showQuiz && showQuiz) {
+      setShowQuiz(false);
+    }
+  }, [featureConfig.showQuiz, showQuiz]);
 
   const handleLoad = async () => {
     setLoading(true);
@@ -335,34 +400,40 @@ function App() {
                     <BookOpen size={18} />
                 </button>
             </div>
-            <div className="relative group ml-1">
+            {featureConfig.showQuiz && (
+              <div className="relative group ml-1">
                 <button
-                    onClick={() => setShowQuiz(true)}
-                    className="cursor-pointer p-1 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-full transition-colors"
-                    title="Quiz Mode"
+                  onClick={() => setShowQuiz(true)}
+                  className="cursor-pointer p-1 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-full transition-colors"
+                  title="Quiz Mode"
                 >
-                    <GraduationCap size={18} />
+                  <GraduationCap size={18} />
                 </button>
-            </div>
-            <div className="relative group ml-1">
-                <button
-                    onClick={() => setShowExercise(true)}
-                    className="cursor-pointer p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-                    title="Exercise Mode"
-                >
-                    <Pencil size={18} />
-                </button>
-            </div>
-            <div className="relative group ml-1">
-                <button
-                    onClick={() => setShowAdmin(true)}
-                    className="cursor-pointer p-1 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-full transition-colors"
-                    title="Admin Dashboard"
-                >
-                    <Users size={18} />
-                </button>
-            </div>
-            <ConfigPanel className="ml-1" />
+              </div>
+            )}
+            {featureConfig.showExercise && (
+              <div className="relative group ml-1">
+                  <button
+                      onClick={() => setShowExercise(true)}
+                      className="cursor-pointer p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                      title="Exercise Mode"
+                  >
+                      <Pencil size={18} />
+                  </button>
+              </div>
+            )}
+            {isAdmin && adminAuthed && (
+              <div className="relative group ml-1">
+                  <button
+                      onClick={() => setShowAdmin(true)}
+                      className="cursor-pointer p-1 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-full transition-colors"
+                      title="Admin Dashboard"
+                  >
+                      <Users size={18} />
+                  </button>
+              </div>
+            )}
+            {isAdmin && adminAuthed && <ConfigPanel className="ml-1" globalConfig={globalConfig} authToken={adminAuthToken} />}
         </div>
         {error && (
             <div className="text-red-600 text-sm font-medium bg-red-50 px-4 py-1.5 rounded-full border border-red-200 animate-pulse shadow-sm flex items-center gap-2">
@@ -439,13 +510,73 @@ function App() {
       <InstructionReference isOpen={showInstrRef} onClose={() => setShowInstrRef(false)} />
 
       {/* Quiz Mode Modal */}
-      <QuizMode isOpen={showQuiz} onClose={() => setShowQuiz(false)} />
+      {featureConfig.showQuiz && (
+        <QuizMode isOpen={showQuiz} onClose={() => setShowQuiz(false)} />
+      )}
 
       {/* Exercise Mode Modal */}
-      <ExerciseMode isOpen={showExercise} onClose={() => setShowExercise(false)} onLoadAsm={handleLoadAsm} />
+      <ExerciseMode
+        isOpen={showExercise}
+        onClose={() => setShowExercise(false)}
+        onLoadAsm={handleLoadAsm}
+        showPart1={featureConfig.showExercisePart1}
+        showPart2={featureConfig.showExercisePart2}
+      />
 
       {/* Admin Panel */}
       <AdminPanel isOpen={showAdmin} onClose={() => setShowAdmin(false)} />
+
+      {/* Admin Auth Modal */}
+      {showAdminAuth && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-[400px] p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Lock size={24} className="text-orange-500" />
+              <h2 className="text-lg font-semibold text-slate-800">Admin Authentication</h2>
+            </div>
+            <p className="text-sm text-slate-600 mb-4">
+              Enter your auth token to access admin features.
+            </p>
+            <div className="space-y-4">
+              <input
+                type="password"
+                placeholder="Auth Token"
+                value={adminAuthToken}
+                onChange={(e) => setAdminAuthToken(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                autoFocus
+              />
+              {adminAuthError && (
+                <div className="flex items-center gap-2 text-red-600 text-sm">
+                  <AlertCircle size={16} />
+                  <span>{adminAuthError}</span>
+                </div>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowAdminAuth(false);
+                    // Remove admin mode from URL
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('mode');
+                    window.history.replaceState({}, '', url.toString());
+                  }}
+                  className="flex-1 px-4 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAdminAuth}
+                  disabled={adminAuthLoading}
+                  className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors"
+                >
+                  {adminAuthLoading ? 'Verifying...' : 'Verify'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

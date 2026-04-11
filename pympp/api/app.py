@@ -15,8 +15,10 @@ from .schema import (
 )
 from .quiz import router as quiz_router
 from .exercise import router as exercise_router
+from .config import router as config_router
 from datetime import datetime, timedelta
 import time
+import os
 
 app = FastAPI(title="MIPS Pipeline Simulator API v2.0")
 logger = get_logger(__name__)
@@ -41,6 +43,9 @@ app.include_router(quiz_router)
 
 # Register Exercise API router
 app.include_router(exercise_router)
+
+# Register Config API router
+app.include_router(config_router)
 
 # Register name mapping
 REG_NAMES = [

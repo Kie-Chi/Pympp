@@ -1,41 +1,115 @@
 import React, { useState } from 'react';
-import { Settings } from 'lucide-react';
-import { appConfig, defaultConfig, demoConfig } from '../config';
+import { Settings, Save, CheckCircle, XCircle } from 'lucide-react';
+import { GlobalConfig } from '../types/schema';
+import { updateGlobalConfig } from '../api/client';
 
 interface ConfigPanelProps {
   className?: string;
+  globalConfig: GlobalConfig;
+  authToken: string;
 }
 
-const CONFIG_STORAGE_KEY = 'mips-simulator-config-preset';
-
-const ConfigPanel: React.FC<ConfigPanelProps> = ({ className = '' }) => {
+const ConfigPanel: React.FC<ConfigPanelProps> = ({ className = '', globalConfig, authToken }) => {
   const [isOpen, setIsOpen] = useState(false);
-  
-  // Initialize from localStorage
-  const getInitialPreset = (): 'default' | 'demo' => {
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      const saved = localStorage.getItem(CONFIG_STORAGE_KEY);
-      return (saved === 'demo' || saved === 'default') ? saved : 'default';
-    }
-    return 'default';
-  };
-  
-  const [currentPreset, setCurrentPreset] = useState<'default' | 'demo' | 'custom'>(getInitialPreset());
+  const [localConfig, setLocalConfig] = useState<GlobalConfig>(globalConfig);
+  const [saving, setSaving] = useState(false);
+  const [saveResult, setSaveResult] = useState<'success' | 'error' | null>(null);
+  const [hasLocalChanges, setHasLocalChanges] = useState(false);
 
-  const applyPreset = (preset: 'default' | 'demo') => {
-    // Save to localStorage before reload
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      localStorage.setItem(CONFIG_STORAGE_KEY, preset);
+  // Only sync localConfig with globalConfig when there are no local changes
+  // This prevents SSE updates from overwriting user's modifications
+  React.useEffect(() => {
+    if (!hasLocalChanges) {
+      setLocalConfig(globalConfig);
     }
-    setCurrentPreset(preset);
-    const targetConfig = preset === 'demo' ? demoConfig : defaultConfig;
-    Object.assign(appConfig, targetConfig);
-    window.location.reload();
+  }, [globalConfig, hasLocalChanges]);
+
+  const toggleConfig = (key: keyof GlobalConfig) => {
+    setHasLocalChanges(true);
+    if (typeof localConfig[key] === 'boolean') {
+      setLocalConfig(prev => ({
+        ...prev,
+        [key]: !prev[key]
+      }));
+    }
   };
+
+  const handleSave = async () => {
+    if (!authToken) return;
+
+    setSaving(true);
+    setSaveResult(null);
+
+    try {
+      await updateGlobalConfig(localConfig, authToken);
+      setSaveResult('success');
+      setHasLocalChanges(false); // Allow sync with server after successful save
+      setTimeout(() => setSaveResult(null), 3000);
+    } catch (err) {
+      console.error('Failed to update config:', err);
+      setSaveResult('error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Config groups
+  const configGroups = [
+    {
+      title: 'Feature Toggles',
+      color: 'purple',
+      items: [
+        { key: 'show_quiz', label: 'Quiz Mode', desc: 'Show Quiz button' },
+        { key: 'show_exercise', label: 'Exercise Mode', desc: 'Show Exercise button' },
+        { key: 'show_exercise_part1', label: 'Exercise Part 1 (AT)', desc: 'AT Method option' },
+        { key: 'show_exercise_part2', label: 'Exercise Part 2 (Matrix)', desc: 'Strategy Matrix option' },
+      ]
+    },
+    {
+      title: 'Editor',
+      color: 'blue',
+      items: [
+        { key: 'editor_fullscreen', label: 'Fullscreen', desc: 'Enable fullscreen mode' },
+        { key: 'editor_editing', label: 'Code Editing', desc: 'Allow editing code' },
+      ]
+    },
+    {
+      title: 'Controls',
+      color: 'green',
+      items: [
+        { key: 'controls_step', label: 'Step', desc: 'Single step execution' },
+        { key: 'controls_step_back', label: 'Step Back', desc: 'Step backward' },
+        { key: 'controls_run', label: 'Run', desc: 'Run until end' },
+        { key: 'controls_continue', label: 'Continue', desc: 'Jump to current cycle' },
+        { key: 'controls_pause', label: 'Pause/Stop', desc: 'Stop execution' },
+        { key: 'controls_reset', label: 'Reset', desc: 'Reset simulator' },
+      ]
+    },
+    {
+      title: 'UI',
+      color: 'indigo',
+      items: [
+        { key: 'ui_show_pipeline', label: 'Pipeline View', desc: 'Show pipeline visualization' },
+        { key: 'ui_show_registers', label: 'Registers View', desc: 'Show register file' },
+        { key: 'ui_show_memory', label: 'Memory View', desc: 'Show memory panel' },
+        { key: 'ui_forwarding_visualization', label: 'Forwarding Lines', desc: 'Show forwarding arrows' },
+        { key: 'ui_change_visualization', label: 'Change Animation', desc: 'Highlight changes' },
+      ]
+    },
+    {
+      title: 'Debug',
+      color: 'orange',
+      items: [
+        { key: 'debug_pc_input', label: 'PC Input', desc: 'Show PC input field' },
+        { key: 'debug_manual_pc', label: 'Manual PC', desc: 'Allow manual PC setting' },
+        { key: 'debug_cycle_slider', label: 'Cycle Slider', desc: 'Enable cycle slider' },
+      ]
+    },
+  ];
 
   return (
     <div className={`relative ${className}`}>
-      {/* 切换按钮 */}
+      {/* Toggle button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="cursor-pointer p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
@@ -44,11 +118,11 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ className = '' }) => {
         <Settings size={18} />
       </button>
 
-      {/* 配置面板 */}
+      {/* Config panel */}
       {isOpen && (
-        <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-xl p-4 w-80 z-50">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold text-slate-700">Configuration Presets</h3>
+        <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-xl w-[360px] z-50 max-h-[80vh] overflow-y-auto">
+          <div className="flex justify-between items-center p-4 border-b border-gray-100 bg-slate-50">
+            <h3 className="font-semibold text-slate-700">Global Configuration</h3>
             <button
               onClick={() => setIsOpen(false)}
               className="text-slate-400 hover:text-slate-600"
@@ -57,95 +131,75 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ className = '' }) => {
             </button>
           </div>
 
-          <div className="space-y-3">
-            {/* 默认配置 */}
-            <button
-              onClick={() => applyPreset('default')}
-              className={`w-full text-left p-3 rounded-md border-2 transition-all ${
-                currentPreset === 'default'
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:border-blue-300'
-              }`}
-            >
-              <div className="font-semibold text-slate-700">Default Mode</div>
-              <div className="text-xs text-slate-500 mt-1">
-                All features enabled, full development experience
-              </div>
-            </button>
-
-            {/* 演示配置 */}
-            <button
-              onClick={() => applyPreset('demo')}
-              className={`w-full text-left p-3 rounded-md border-2 transition-all ${
-                currentPreset === 'demo'
-                  ? 'border-amber-500 bg-amber-50'
-                  : 'border-gray-200 hover:border-amber-300'
-              }`}
-            >
-              <div className="font-semibold text-slate-700">Demo Mode</div>
-              <div className="text-xs text-slate-500 mt-1">
-                Limited editing and features, suitable for demonstrations
-              </div>
-            </button>
-          </div>
-
-          {/* 当前配置状态 */}
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="text-xs text-slate-600 space-y-1">
-              <div className="font-semibold mb-2">Current Configuration:</div>
-              <div className="flex justify-between">
-                <span>Editor Fullscreen:</span>
-                <span className={appConfig.editor.enableFullscreen ? 'text-green-600' : 'text-red-600'}>
-                  {appConfig.editor.enableFullscreen ? '✓ Enabled' : '✗ Disabled'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Code Editing:</span>
-                <span className={appConfig.editor.enableEditing ? 'text-green-600' : 'text-red-600'}>
-                  {appConfig.editor.enableEditing ? '✓ Enabled' : '✗ Disabled'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Step Back Button:</span>
-                <span className={appConfig.controls.enableStepBack ? 'text-green-600' : 'text-red-600'}>
-                  {appConfig.controls.enableStepBack ? '✓ Enabled' : '✗ Disabled'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Run Button:</span>
-                <span className={appConfig.controls.enableRun ? 'text-green-600' : 'text-red-600'}>
-                  {appConfig.controls.enableRun ? '✓ Enabled' : '✗ Disabled'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Forwarding Visualization:</span>
-                <span className={appConfig.ui.enableForwardingVisualization ? 'text-green-600' : 'text-red-600'}>
-                  {appConfig.ui.enableForwardingVisualization ? '✓ Enabled' : '✗ Disabled'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Change Animation:</span>
-                <span className={appConfig.ui.enableChangeVisualization ? 'text-green-600' : 'text-red-600'}>
-                  {appConfig.ui.enableChangeVisualization ? '✓ Enabled' : '✗ Disabled'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>PC Input:</span>
-                <span className={appConfig.debug.showPCInput ? 'text-green-600' : 'text-red-600'}>
-                  {appConfig.debug.showPCInput ? '✓ Shown' : '✗ Hidden'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Cycle Slider:</span>
-                <span className={appConfig.debug.enableCycleSlider ? 'text-green-600' : 'text-red-600'}>
-                  {appConfig.debug.enableCycleSlider ? '✓ Enabled' : '✗ Disabled'}
-                </span>
-              </div>
+          {/* Auth status */}
+          <div className="p-4 border-b border-gray-100 bg-green-50">
+            <div className="flex items-center gap-2">
+              <CheckCircle size={16} className="text-green-600" />
+              <span className="text-sm font-medium text-green-700">Authenticated - You can modify configuration</span>
             </div>
           </div>
 
-          <div className="mt-4 text-xs text-slate-400 text-center">
-            Page will reload after switching configuration
+          {/* Config groups */}
+          <div className="p-4 space-y-4">
+            {configGroups.map(group => (
+              <div key={group.title}>
+                <h4 className={`text-sm font-semibold mb-2 text-${group.color}-700 border-b border-${group.color}-200 pb-1`}>
+                  {group.title}
+                </h4>
+                <div className="space-y-2">
+                  {group.items.map(item => (
+                    <div
+                      key={item.key}
+                      onClick={() => toggleConfig(item.key as keyof GlobalConfig)}
+                      className={`flex items-center justify-between p-2 rounded border transition-colors cursor-pointer hover:bg-slate-50 ${
+                        localConfig[item.key as keyof GlobalConfig]
+                          ? 'border-green-300 bg-green-50'
+                          : 'border-gray-200'
+                      }`}
+                    >
+                      <div>
+                        <span className="text-sm font-medium text-slate-700">{item.label}</span>
+                        <span className="text-xs text-slate-500 ml-2">{item.desc}</span>
+                      </div>
+                      <div className={`w-8 h-5 rounded-full transition-colors ${
+                        localConfig[item.key as keyof GlobalConfig]
+                          ? 'bg-green-500'
+                          : 'bg-gray-300'
+                      }`}>
+                        <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform ${
+                          localConfig[item.key as keyof GlobalConfig]
+                            ? 'translate-x-4'
+                            : 'translate-x-0.5'
+                        } mt-0.5`} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Save button */}
+          <div className="p-4 border-t border-gray-100 bg-slate-50">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                <Save size={16} />
+                {saving ? 'Saving...' : 'Save Configuration'}
+              </button>
+              {saveResult === 'success' && (
+                <CheckCircle size={20} className="text-green-600" />
+              )}
+              {saveResult === 'error' && (
+                <XCircle size={20} className="text-red-600" />
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-2 text-center">
+              Changes will be synced to all active sessions
+            </p>
           </div>
         </div>
       )}
