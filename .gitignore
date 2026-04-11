@@ -15,7 +15,9 @@
 !run_server.py
 !.dockerignore
 !docker-compose.yml
+!docker-compose*
 !Dockerfile
+!run.sh
 **/__pycache__/**
 **/.mypy_cache/**
 **/__pycache__

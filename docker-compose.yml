@@ -7,6 +7,8 @@ services:
     ports:
       - "28000:28000"
     restart: unless-stopped
+    environment:
+      - PYMPP_TYPE=${PYMPP_TYPE:-prod}
 
   frontend:
     build:
@@ -18,3 +20,5 @@ services:
     ports:
       - "5173:5173"
     restart: unless-stopped
+    environment:
+      - PYMPP_TYPE=${PYMPP_TYPE:-prod}
