@@ -14,6 +14,7 @@ from .schema import (
     EventsSchema, ForwardingSchema, ChangeSchema
 )
 from .quiz import router as quiz_router
+from .exercise import router as exercise_router
 from datetime import datetime, timedelta
 import time
 
@@ -37,6 +38,9 @@ app.add_middleware(
 
 # Register Quiz API router
 app.include_router(quiz_router)
+
+# Register Exercise API router
+app.include_router(exercise_router)
 
 # Register name mapping
 REG_NAMES = [
