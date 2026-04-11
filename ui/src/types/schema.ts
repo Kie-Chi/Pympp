@@ -80,3 +80,72 @@ export interface MemoryPageResponse {
   start_addr: string;
   values: string[];
 }
+
+// === Quiz API Types ===
+
+export interface QuizStartRequest {
+  total_questions: number;
+}
+
+export interface QuizStartResponse {
+  quiz_session_id: string;
+  started_at: string;
+}
+
+export interface QuizAnswerRequest {
+  quiz_session_id: string;
+  instruction_name: string;
+  question_index: number;
+  user_tuse_rs: number | null;  // null for '-', -99 for UNKNOWN
+  user_tuse_rt: number | null;
+  user_tnew: number | null;
+  correct_tuse_rs: string;
+  correct_tuse_rt: string;
+  correct_tnew: string;
+  is_correct: boolean;
+}
+
+export interface QuizAnswerResponse {
+  record_id: number;
+  success: boolean;
+}
+
+export interface QuizEndRequest {
+  quiz_session_id: string;
+  correct_count: number;
+}
+
+export interface QuizSessionSummary {
+  quiz_session_id: string;
+  total_questions: number;
+  correct_count: number;
+  started_at: string | null;
+  ended_at: string | null;
+}
+
+export interface QuizRecordItem {
+  id: number;
+  instruction_name: string;
+  question_index: number;
+  user_tuse_rs: number | null;
+  user_tuse_rt: number | null;
+  user_tnew: number | null;
+  correct_tuse_rs: string;
+  correct_tuse_rt: string;
+  correct_tnew: string;
+  is_correct: boolean;
+  created_at: string | null;
+}
+
+export interface QuizHistoryResponse {
+  sessions: QuizSessionSummary[];
+  records: QuizRecordItem[];
+}
+
+export interface QuizStatsResponse {
+  total_sessions: number;
+  total_questions: number;
+  correct_count: number;
+  accuracy_rate: number;
+  most_wrong_instructions: string[];
+}

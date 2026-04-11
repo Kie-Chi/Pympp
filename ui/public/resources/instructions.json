@@ -5,7 +5,7 @@
     "description": "Add Word: $rd = $rs + $rt",
     "tuse_rs": [1],
     "tuse_rt": [1],
-    "tnew": [1]
+    "tnew": [2]
   },
   {
     "name": "sub",
@@ -13,7 +13,7 @@
     "description": "Subtract Word: $rd = $rs - $rt",
     "tuse_rs": [1],
     "tuse_rt": [1],
-    "tnew": [1]
+    "tnew": [2]
   },
   {
     "name": "ori",
@@ -21,7 +21,7 @@
     "description": "Or Immediate: $rt = $rs | imm",
     "tuse_rs": [1],
     "tuse_rt": [null],
-    "tnew": [1]
+    "tnew": [2]
   },
   {
     "name": "lui",
@@ -29,7 +29,7 @@
     "description": "Load Upper Immediate: $rt = imm << 16",
     "tuse_rs": [null],
     "tuse_rt": [null],
-    "tnew": [1]
+    "tnew": [2]
   },
   {
     "name": "lw",
@@ -37,7 +37,7 @@
     "description": "Load Word: $rt = MEM[$rs + offset]",
     "tuse_rs": [1],
     "tuse_rt": [null],
-    "tnew": [2]
+    "tnew": [3]
   },
   {
     "name": "sw",
@@ -61,7 +61,7 @@
     "description": "Jump and Link: $ra = PC+8; goto label",
     "tuse_rs": [null],
     "tuse_rt": [null],
-    "tnew": [0]
+    "tnew": [1]
   },
   {
     "name": "jr",
@@ -70,5 +70,13 @@
     "tuse_rs": [0],
     "tuse_rt": [null],
     "tnew": [null]
+  },
+  {
+    "name": "jalx",
+    "syntax": "jalx $rs",
+    "description": "descriptions/jalx.md",
+    "tuse_rs": [0],
+    "tuse_rt": [null],
+    "tnew": [1]
   }
 ]

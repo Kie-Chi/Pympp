@@ -1,5 +1,9 @@
 import axios from 'axios';
-import { LoadResponse, ResetResponse, Snapshot, CycleInfo, MemoryPageResponse } from '../types/schema';
+import {
+  LoadResponse, ResetResponse, Snapshot, CycleInfo, MemoryPageResponse,
+  QuizStartResponse, QuizAnswerRequest, QuizAnswerResponse,
+  QuizSessionSummary, QuizHistoryResponse, QuizStatsResponse
+} from '../types/schema';
 
 const generateSessionId = (): string => {
   const c = globalThis.crypto;
@@ -112,5 +116,35 @@ export const getMemoryPage = async (startAddr: string, lines: number = 16, cycle
       params.cycle = cycle;
   }
   const res = await api.get<MemoryPageResponse>('/get_memory_page', { params });
+  return res.data;
+};
+
+// === Quiz API ===
+
+export const startQuizSession = async (totalQuestions: number): Promise<QuizStartResponse> => {
+  const res = await api.post<QuizStartResponse>('/quiz/start', { total_questions: totalQuestions });
+  return res.data;
+};
+
+export const recordQuizAnswer = async (record: QuizAnswerRequest): Promise<QuizAnswerResponse> => {
+  const res = await api.post<QuizAnswerResponse>('/quiz/record_answer', record);
+  return res.data;
+};
+
+export const endQuizSession = async (quizSessionId: string, correctCount: number): Promise<QuizSessionSummary> => {
+  const res = await api.post<QuizSessionSummary>('/quiz/end', {
+    quiz_session_id: quizSessionId,
+    correct_count: correctCount
+  });
+  return res.data;
+};
+
+export const getQuizHistory = async (): Promise<QuizHistoryResponse> => {
+  const res = await api.get<QuizHistoryResponse>('/quiz/history');
+  return res.data;
+};
+
+export const getQuizStats = async (): Promise<QuizStatsResponse> => {
+  const res = await api.get<QuizStatsResponse>('/quiz/stats');
   return res.data;
 };

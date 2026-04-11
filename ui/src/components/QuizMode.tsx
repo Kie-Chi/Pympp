@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, XCircle, RefreshCw, Trophy, FileText, Maximize2, Minimize2 } from 'lucide-react';
+import { startQuizSession, recordQuizAnswer, endQuizSession } from '../api/client';
+import { QuizAnswerRequest } from '../types/schema';
 
 interface Instruction {
   name: string;
@@ -54,7 +56,10 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [descriptionContent, setDescriptionContent] = useState<string | null>(null);
   const [isDescriptionFullScreen, setIsDescriptionFullScreen] = useState(false);
-  
+
+  // Quiz session for backend recording
+  const [quizSessionId, setQuizSessionId] = useState<string | null>(null);
+
   const [answers, setAnswers] = useState<{
     tuse_rs: string;
     tuse_rt: string;
@@ -125,8 +130,19 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
       const res = await fetch('/resources/instructions.json');
       const data = await res.json();
       // Shuffle instructions every time
-      setInstructions(data.sort(() => Math.random() - 0.5));
+      const shuffled = data.sort(() => Math.random() - 0.5);
+      setInstructions(shuffled);
       resetQuiz();
+
+      // Start quiz session on backend
+      try {
+        const quizRes = await startQuizSession(shuffled.length);
+        setQuizSessionId(quizRes.quiz_session_id);
+      } catch (err) {
+        console.error('Failed to start quiz session:', err);
+        // Continue without backend recording
+        setQuizSessionId(null);
+      }
     } catch (err) {
       console.error('Failed to load instructions:', err);
     } finally {
@@ -142,6 +158,7 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
     setFeedback(null);
     setCorrectAnswers(null);
     setHasSubmitted(false);
+    setQuizSessionId(null);
   };
 
   const handleAnswerChange = (field: keyof typeof answers, value: string) => {
@@ -154,10 +171,10 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
     const checkField = (userAnswer: string, correctValues: (number | null)[]) => {
       const mappedUser = REVERSE_STAGE_MAP[userAnswer];
       if (mappedUser === undefined) return false;
-      
+
       return correctValues.some(val => val === mappedUser);
     };
-    
+
     const getStageString = (values: (number | null)[]): string => {
       if (values.length === 0 || values.every(v => v === null)) return '-';
       const stages = values
@@ -177,30 +194,57 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
     const isRsCorrect = checkField(answers.tuse_rs, current.tuse_rs);
     const isRtCorrect = checkField(answers.tuse_rt, current.tuse_rt);
     const isTnewCorrect = checkField(answers.tnew, current.tnew);
+    const allCorrect = isRsCorrect && isRtCorrect && isTnewCorrect;
 
     setFeedback({
       tuse_rs: isRsCorrect,
       tuse_rt: isRtCorrect,
       tnew: isTnewCorrect
     });
-    
+
     // Set correct answers
     setCorrectAnswers({
       tuse_rs: getStageString(current.tuse_rs),
       tuse_rt: getStageString(current.tuse_rt),
       tnew: getStageString(current.tnew)
     });
-    
+
     setHasSubmitted(true);
 
-    if (isRsCorrect && isRtCorrect && isTnewCorrect) {
+    if (allCorrect) {
       setScore(s => s + 1);
+    }
+
+    // Record answer to backend
+    if (quizSessionId) {
+      const record: QuizAnswerRequest = {
+        quiz_session_id: quizSessionId,
+        instruction_name: current.name,
+        question_index: currentIdx,
+        user_tuse_rs: REVERSE_STAGE_MAP[answers.tuse_rs] ?? null,
+        user_tuse_rt: REVERSE_STAGE_MAP[answers.tuse_rt] ?? null,
+        user_tnew: REVERSE_STAGE_MAP[answers.tnew] ?? null,
+        correct_tuse_rs: getStageString(current.tuse_rs),
+        correct_tuse_rt: getStageString(current.tuse_rt),
+        correct_tnew: getStageString(current.tnew),
+        is_correct: allCorrect
+      };
+
+      recordQuizAnswer(record).catch(err => {
+        console.error('Failed to record quiz answer:', err);
+      });
     }
   };
 
   const nextQuestion = () => {
     if (currentIdx + 1 >= instructions.length) {
       setShowResult(true);
+      // End quiz session on backend
+      if (quizSessionId) {
+        endQuizSession(quizSessionId, score).catch(err => {
+          console.error('Failed to end quiz session:', err);
+        });
+      }
     } else {
       setCurrentIdx(c => c + 1);
       setAnswers({ tuse_rs: '', tuse_rt: '', tnew: '' });
@@ -208,6 +252,18 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
       setCorrectAnswers(null);
       setHasSubmitted(false);
     }
+  };
+
+  // Handle closing quiz modal - end session if not finished
+  const handleClose = () => {
+    // If quiz session exists and not finished, end it
+    // This captures incomplete quizzes - user answered some questions but quit early
+    if (quizSessionId && !showResult) {
+      endQuizSession(quizSessionId, score).catch(err => {
+        console.error('Failed to end quiz session on close:', err);
+      });
+    }
+    onClose();
   };
 
   const renderSelect = (field: keyof typeof answers, label: string) => {
@@ -270,7 +326,7 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
   const currentInstr = instructions[currentIdx];
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={handleClose}>
       <div 
         className={`bg-white rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col transition-all
           ${isFullScreen ? 'w-full h-full max-w-none max-h-none rounded-none' : 'w-full max-w-2xl max-h-[90vh]'}`}
@@ -289,7 +345,7 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
             >
               {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
             </button>
-            <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 rounded-full transition-colors">
+            <button onClick={handleClose} className="p-1 text-slate-400 hover:text-slate-600 rounded-full transition-colors">
               <X size={24} />
             </button>
           </div>
