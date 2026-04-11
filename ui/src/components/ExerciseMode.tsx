@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, CheckCircle, XCircle, Eye, Trophy, Maximize2, Minimize2 } from 'lucide-react';
+import { X, CheckCircle, XCircle, Eye, Trophy, Maximize2, Minimize2, LayoutGrid, FileText, Grid3x3 } from 'lucide-react';
 import { startExerciseSession, recordExerciseAnswer, endExerciseSession } from '../api/client';
 import { ExerciseAnswerRequest } from '../types/schema';
 
@@ -39,7 +39,8 @@ const REVERSE_STAGE_MAP: Record<string, number | null | undefined> = {
   'UNKNOWN': -99,
 };
 
-const STORAGE_KEY = 'exercise_state';
+const STORAGE_KEY_AT = 'exercise_state_at';
+const STORAGE_KEY_MATRIX = 'exercise_state_matrix';
 
 interface SavedState {
   answers: Record<string, { tuse_rs: string; tuse_rt: string; tnew: string }>;
@@ -47,63 +48,141 @@ interface SavedState {
   score: number;
   exerciseSessionId: string | null;
   instructions: Instruction[];
-  savedAt: number;  // Timestamp when state was saved
+  savedAt: number;
 }
+
+interface MatrixSavedState {
+  answersRS: Record<string, string>;
+  answersRT: Record<string, string>;
+  scoreRS: number;
+  scoreRT: number;
+  sessionId: string | null;
+  savedAt: number;
+}
+
+// Strategy matrix columns: E_ALU, E_DM, E_PC, M_ALU, M_DM, M_PC, W_ALU, W_DM, W_PC
+const MATRIX_COLUMNS = [
+  { key: 'E_ALU', label: 'E级\nALU', tnew: 1 },
+  { key: 'E_DM', label: 'E级\nDM', tnew: 2 },
+  { key: 'E_PC', label: 'E级\nPC', tnew: 0 },
+  { key: 'M_ALU', label: 'M级\nALU', tnew: 0 },
+  { key: 'M_DM', label: 'M级\nDM', tnew: 1 },
+  { key: 'M_PC', label: 'M级\nPC', tnew: 0 },
+  { key: 'W_ALU', label: 'W级\nALU', tnew: 0 },
+  { key: 'W_DM', label: 'W级\nDM', tnew: 0 },
+  { key: 'W_PC', label: 'W级\nPC', tnew: 0 },
+];
+
+// RS: Tuse = 0, 1; RT: Tuse = 0, 1, 2
+const MATRIX_ROWS_RS = [
+  { tuse: 0, label: 'Tuse = 0' },
+  { tuse: 1, label: 'Tuse = 1' },
+];
+
+const MATRIX_ROWS_RT = [
+  { tuse: 0, label: 'Tuse = 0' },
+  { tuse: 1, label: 'Tuse = 1' },
+  { tuse: 2, label: 'Tuse = 2' },
+];
 
 const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+type ExercisePart = 'AT' | 'Matrix';
+
 const ExerciseMode: React.FC<Props> = ({ isOpen, onClose, onLoadAsm }) => {
+  // Part selection state
+  const [selectedPart, setSelectedPart] = useState<ExercisePart | null>(null);
+  const [showPartSelection, setShowPartSelection] = useState(true);
+
+  // AT Method state
   const [instructions, setInstructions] = useState<Instruction[]>([]);
   const [loading, setLoading] = useState(true);
   const [score, setScore] = useState(0);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
-
-  // Exercise session
   const [exerciseSessionId, setExerciseSessionId] = useState<string | null>(null);
-
-  // Answers for each instruction (key = instruction name)
   const [answers, setAnswers] = useState<Record<string, { tuse_rs: string; tuse_rt: string; tnew: string }>>({});
-
-  // Feedback for each instruction
   const [feedback, setFeedback] = useState<Record<string, { tuse_rs?: boolean; tuse_rt?: boolean; tnew?: boolean }>>({});
-
-  // Continue prompt
   const [showContinuePrompt, setShowContinuePrompt] = useState(false);
   const [savedState, setSavedState] = useState<SavedState | null>(null);
 
+  // Matrix state (combined RS + RT)
+  const [matrixAnswersRS, setMatrixAnswersRS] = useState<Record<string, string>>({});  // key: "E_ALU_0" -> "S" or "F"
+  const [matrixAnswersRT, setMatrixAnswersRT] = useState<Record<string, string>>({});
+  const [matrixFeedbackRS, setMatrixFeedbackRS] = useState<Record<string, boolean | undefined>>({});
+  const [matrixFeedbackRT, setMatrixFeedbackRT] = useState<Record<string, boolean | undefined>>({});
+  const [matrixScoreRS, setMatrixScoreRS] = useState(0);
+  const [matrixScoreRT, setMatrixScoreRT] = useState(0);
+  const [matrixSessionId, setMatrixSessionId] = useState<string | null>(null);
+  const [matrixSubmitted, setMatrixSubmitted] = useState(false);
+  const [matrixShowResult, setMatrixShowResult] = useState(false);
+  const [matrixShowContinuePrompt, setMatrixShowContinuePrompt] = useState(false);
+  const [matrixSavedState, setMatrixSavedState] = useState<MatrixSavedState | null>(null);
+
   useEffect(() => {
     if (isOpen) {
-      // Check for saved state
-      const saved = localStorage.getItem(STORAGE_KEY);
+      // Reset to show part selection first
+      setShowPartSelection(true);
+      setSelectedPart(null);
+      setLoading(false);
+    }
+  }, [isOpen]);
+
+  // Handle part selection
+  const handleSelectPart = (part: ExercisePart) => {
+    setSelectedPart(part);
+    setShowPartSelection(false);
+    setShowContinuePrompt(false);
+
+    if (part === 'AT') {
+      const saved = localStorage.getItem(STORAGE_KEY_AT);
       if (saved) {
         try {
           const state: SavedState = JSON.parse(saved);
-          // Check if session has expired
           if (state.savedAt && Date.now() - state.savedAt > SESSION_EXPIRY_MS) {
-            // Session expired - end it on backend and clear localStorage
             if (state.exerciseSessionId) {
-              endExerciseSession(state.exerciseSessionId).catch(err => {
-                console.error('Failed to end expired exercise session:', err);
-              });
+              endExerciseSession(state.exerciseSessionId).catch(err => console.error(err));
             }
-            localStorage.removeItem(STORAGE_KEY);
-            loadInstructions(false);
+            localStorage.removeItem(STORAGE_KEY_AT);
+            loadInstructions(false, part);
           } else {
             setSavedState(state);
             setShowContinuePrompt(true);
           }
         } catch {
-          loadInstructions(false);
+          loadInstructions(false, part);
         }
       } else {
-        loadInstructions(false);
+        loadInstructions(false, part);
+      }
+    } else {
+      // Matrix mode (combined RS + RT)
+      const saved = localStorage.getItem(STORAGE_KEY_MATRIX);
+      if (saved) {
+        try {
+          const state: MatrixSavedState = JSON.parse(saved);
+          if (state.savedAt && Date.now() - state.savedAt > SESSION_EXPIRY_MS) {
+            // Session expired
+            if (state.sessionId) {
+              endExerciseSession(state.sessionId).catch(err => console.error(err));
+            }
+            localStorage.removeItem(STORAGE_KEY_MATRIX);
+            loadMatrixPart(false);
+          } else {
+            setMatrixSavedState(state);
+            setMatrixShowContinuePrompt(true);
+          }
+        } catch {
+          loadMatrixPart(false);
+        }
+      } else {
+        loadMatrixPart(false);
       }
     }
-  }, [isOpen]);
+  };
 
-  const loadInstructions = async (restoreState: boolean = false) => {
+  const loadInstructions = async (restoreState: boolean = false, part: ExercisePart = 'AT') => {
     setLoading(true);
     setShowContinuePrompt(false);
 
@@ -163,18 +242,249 @@ const ExerciseMode: React.FC<Props> = ({ isOpen, onClose, onLoadAsm }) => {
 
   // Save state whenever it changes
   useEffect(() => {
-    if (!loading && instructions.length > 0 && !showResult && !showContinuePrompt) {
+    if (!loading && selectedPart === 'AT' && instructions.length > 0 && !showResult && !showContinuePrompt && !showPartSelection) {
       const state: SavedState = {
         answers,
         currentInstructionIndex: 0,
         score,
         exerciseSessionId,
         instructions,
-        savedAt: Date.now(),  // Add timestamp for expiry check
+        savedAt: Date.now(),
       };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(STORAGE_KEY_AT, JSON.stringify(state));
     }
-  }, [answers, score, exerciseSessionId, instructions, loading, showResult, showContinuePrompt]);
+  }, [answers, score, exerciseSessionId, instructions, loading, showResult, showContinuePrompt, showPartSelection, selectedPart]);
+
+  // Save Matrix state whenever it changes
+  useEffect(() => {
+    if (!loading && selectedPart === 'Matrix' && !matrixShowResult && !matrixShowContinuePrompt && !showPartSelection) {
+      const state: MatrixSavedState = {
+        answersRS: matrixAnswersRS,
+        answersRT: matrixAnswersRT,
+        scoreRS: matrixScoreRS,
+        scoreRT: matrixScoreRT,
+        sessionId: matrixSessionId,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem(STORAGE_KEY_MATRIX, JSON.stringify(state));
+    }
+  }, [matrixAnswersRS, matrixAnswersRT, matrixScoreRS, matrixScoreRT, matrixSessionId, loading, matrixShowResult, matrixShowContinuePrompt, showPartSelection, selectedPart]);
+
+  // Load Matrix part (combined RS + RT)
+  const loadMatrixPart = async (restoreState: boolean = false) => {
+    setLoading(true);
+    setMatrixShowContinuePrompt(false);
+
+    if (restoreState && matrixSavedState) {
+      // Restore saved state - continue previous session
+      setMatrixAnswersRS(matrixSavedState.answersRS);
+      setMatrixAnswersRT(matrixSavedState.answersRT);
+      setMatrixScoreRS(matrixSavedState.scoreRS);
+      setMatrixScoreRT(matrixSavedState.scoreRT);
+      setMatrixSessionId(matrixSavedState.sessionId);
+      setMatrixFeedbackRS({});
+      setMatrixFeedbackRT({});
+      setMatrixSubmitted(false);
+      setMatrixShowResult(false);
+      setLoading(false);
+      return;
+    }
+
+    // If starting new session, end the previous one first (if exists)
+    if (matrixSavedState?.sessionId) {
+      endExerciseSession(matrixSavedState.sessionId).catch(err => console.error(err));
+      localStorage.removeItem(STORAGE_KEY_MATRIX);
+    }
+
+    // Initialize fresh state
+    setMatrixAnswersRS({});
+    setMatrixAnswersRT({});
+    setMatrixFeedbackRS({});
+    setMatrixFeedbackRT({});
+    setMatrixScoreRS(0);
+    setMatrixScoreRT(0);
+    setMatrixSubmitted(false);
+    setMatrixShowResult(false);
+
+    // Total cells: RS (2 rows * 9 cols) + RT (3 rows * 9 cols) = 18 + 27 = 45
+    const totalCells = MATRIX_ROWS_RS.length * MATRIX_COLUMNS.length + MATRIX_ROWS_RT.length * MATRIX_COLUMNS.length;
+
+    try {
+      const res = await startExerciseSession(totalCells, 2);
+      setMatrixSessionId(res.exercise_session_id);
+    } catch (err) {
+      console.error('Failed to start matrix session:', err);
+      setMatrixSessionId(null);
+    }
+
+    setLoading(false);
+  };
+
+  // Matrix answer change
+  const handleMatrixAnswerChange = (type: 'RS' | 'RT', colKey: string, tuse: number, value: string) => {
+    const key = `${colKey}_${tuse}`;
+    if (type === 'RS') {
+      setMatrixAnswersRS(prev => ({ ...prev, [key]: value }));
+      setMatrixFeedbackRS(prev => ({ ...prev, [key]: undefined }));
+    } else {
+      setMatrixAnswersRT(prev => ({ ...prev, [key]: value }));
+      setMatrixFeedbackRT(prev => ({ ...prev, [key]: undefined }));
+    }
+    setMatrixSubmitted(false);
+  };
+
+  // Check matrix answers
+  const checkMatrixAnswers = () => {
+    const newFeedbackRS: Record<string, boolean | undefined> = {};
+    const newFeedbackRT: Record<string, boolean | undefined> = {};
+    let newScoreRS = 0;
+    let newScoreRT = 0;
+
+    // Check RS - skip empty (Not Selected)
+    MATRIX_ROWS_RS.forEach(row => {
+      MATRIX_COLUMNS.forEach(col => {
+        const key = `${col.key}_${row.tuse}`;
+        const userAnswer = matrixAnswersRS[key];
+        // Skip if not selected (empty)
+        if (userAnswer === '' || userAnswer === undefined) {
+          newFeedbackRS[key] = undefined;  // undefined = not checked
+          return;
+        }
+        const correctAnswer = col.tnew <= row.tuse ? 'F' : 'S';
+        const isCorrect = userAnswer === correctAnswer;
+        newFeedbackRS[key] = isCorrect;
+        if (isCorrect) newScoreRS++;
+      });
+    });
+
+    // Check RT - skip empty (Not Selected)
+    MATRIX_ROWS_RT.forEach(row => {
+      MATRIX_COLUMNS.forEach(col => {
+        const key = `${col.key}_${row.tuse}`;
+        const userAnswer = matrixAnswersRT[key];
+        // Skip if not selected (empty)
+        if (userAnswer === '' || userAnswer === undefined) {
+          newFeedbackRT[key] = undefined;  // undefined = not checked
+          return;
+        }
+        const correctAnswer = col.tnew <= row.tuse ? 'F' : 'S';
+        const isCorrect = userAnswer === correctAnswer;
+        newFeedbackRT[key] = isCorrect;
+        if (isCorrect) newScoreRT++;
+      });
+    });
+
+    setMatrixFeedbackRS(newFeedbackRS);
+    setMatrixFeedbackRT(newFeedbackRT);
+    setMatrixScoreRS(newScoreRS);
+    setMatrixScoreRT(newScoreRT);
+    setMatrixSubmitted(true);
+
+    const totalRS = MATRIX_ROWS_RS.length * MATRIX_COLUMNS.length;
+    const totalRT = MATRIX_ROWS_RT.length * MATRIX_COLUMNS.length;
+
+    // Check if all filled AND all correct
+    const allFilledRS = Object.values(matrixAnswersRS).every(v => v !== '' && v !== undefined);
+    const allFilledRT = Object.values(matrixAnswersRT).every(v => v !== '' && v !== undefined);
+    const allCorrect = newScoreRS === totalRS && newScoreRT === totalRT;
+
+    if (allFilledRS && allFilledRT && allCorrect) {
+      setMatrixShowResult(true);
+      localStorage.removeItem(STORAGE_KEY_MATRIX);
+    }
+
+    // Record to backend - only record filled answers
+    if (matrixSessionId) {
+      // Record RS
+      MATRIX_ROWS_RS.forEach(row => {
+        MATRIX_COLUMNS.forEach(col => {
+          const key = `${col.key}_${row.tuse}`;
+          const userAnswer = matrixAnswersRS[key] || '';
+          if (userAnswer === '') return;  // Skip not selected
+
+          const correctAnswer = col.tnew <= row.tuse ? 'F' : 'S';
+          const record: ExerciseAnswerRequest = {
+            exercise_session_id: matrixSessionId,
+            instruction_name: `RS_${col.key}_${row.tuse}`,
+            question_index: 0,
+            part: 2,
+            user_tuse_rs: null,
+            user_tuse_rt: null,
+            user_tnew: null,
+            correct_tuse_rs: '',
+            correct_tuse_rt: '',
+            correct_tnew: '',
+            matrix_row: row.tuse,
+            matrix_col: col.tnew,
+            user_answer: userAnswer,
+            correct_answer: correctAnswer,
+            is_correct: userAnswer === correctAnswer,
+          };
+          recordExerciseAnswer(record).catch(err => console.error(err));
+        });
+      });
+
+      // Record RT
+      MATRIX_ROWS_RT.forEach(row => {
+        MATRIX_COLUMNS.forEach(col => {
+          const key = `${col.key}_${row.tuse}`;
+          const userAnswer = matrixAnswersRT[key] || '';
+          if (userAnswer === '') return;  // Skip not selected
+
+          const correctAnswer = col.tnew <= row.tuse ? 'F' : 'S';
+          const record: ExerciseAnswerRequest = {
+            exercise_session_id: matrixSessionId,
+            instruction_name: `RT_${col.key}_${row.tuse}`,
+            question_index: 0,
+            part: 2,
+            user_tuse_rs: null,
+            user_tuse_rt: null,
+            user_tnew: null,
+            correct_tuse_rs: '',
+            correct_tuse_rt: '',
+            correct_tnew: '',
+            matrix_row: row.tuse,
+            matrix_col: col.tnew,
+            user_answer: userAnswer,
+            correct_answer: correctAnswer,
+            is_correct: userAnswer === correctAnswer,
+          };
+          recordExerciseAnswer(record).catch(err => console.error(err));
+        });
+      });
+
+      // Only end session when all correct
+      if (allFilledRS && allFilledRT && allCorrect) {
+        endExerciseSession(matrixSessionId).catch(err => console.error(err));
+      }
+    }
+  };
+
+  // Render matrix cell
+  const renderMatrixCell = (type: 'RS' | 'RT', colKey: string, tuse: number) => {
+    const key = `${colKey}_${tuse}`;
+    const userAnswer = type === 'RS' ? matrixAnswersRS[key] || '' : matrixAnswersRT[key] || '';
+    const cellFeedback = type === 'RS' ? matrixFeedbackRS[key] : matrixFeedbackRT[key];
+    const isCorrect = cellFeedback === true;
+    const isWrong = cellFeedback === false;
+
+    return (
+      <select
+        className={`w-14 text-center py-1 border rounded font-mono text-sm appearance-none outline-none transition-colors
+          ${isCorrect ? 'border-green-500 bg-green-50 text-green-700' :
+            isWrong ? 'border-red-500 bg-red-50 text-red-700' :
+            userAnswer ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'}
+          ${matrixShowResult ? 'cursor-not-allowed' : 'cursor-pointer hover:border-blue-400'}`}
+        value={userAnswer}
+        onChange={(e) => handleMatrixAnswerChange(type, colKey, tuse, e.target.value)}
+        disabled={matrixShowResult}
+      >
+        <option value="">-</option>
+        <option value="S">S</option>
+        <option value="F">F</option>
+      </select>
+    );
+  };
 
   const handleAnswerChange = (instrName: string, field: 'tuse_rs' | 'tuse_rt' | 'tnew', value: string) => {
     setAnswers(prev => ({
@@ -365,6 +675,12 @@ const ExerciseMode: React.FC<Props> = ({ isOpen, onClose, onLoadAsm }) => {
 
   if (!isOpen) return null;
 
+  const getPartLabel = () => {
+    if (selectedPart === 'AT') return 'AT Method';
+    if (selectedPart === 'Matrix') return 'Strategy Matrix';
+    return '';
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={handleClose}>
       <div
@@ -376,9 +692,23 @@ const ExerciseMode: React.FC<Props> = ({ isOpen, onClose, onLoadAsm }) => {
         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-slate-50 flex-shrink-0">
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-bold text-slate-800">Pipeline Exercise</h2>
-            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">AT Method</span>
+            {!showPartSelection && selectedPart && (
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">{getPartLabel()}</span>
+            )}
           </div>
           <div className="flex items-center gap-2">
+            {!showPartSelection && selectedPart && (
+              <button
+                onClick={() => {
+                  setShowPartSelection(true);
+                  setSelectedPart(null);
+                }}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-full transition-colors"
+                title="Change Part"
+              >
+                <LayoutGrid size={20} />
+              </button>
+            )}
             <button
               onClick={() => setIsFullScreen(!isFullScreen)}
               className="p-1 text-slate-400 hover:text-slate-600 rounded-full transition-colors"
@@ -394,24 +724,52 @@ const ExerciseMode: React.FC<Props> = ({ isOpen, onClose, onLoadAsm }) => {
 
         {/* Content */}
         <div className="p-6 overflow-y-auto flex-1">
-          {/* Continue Prompt */}
-          {showContinuePrompt && savedState && (
+          {/* Part Selection */}
+          {showPartSelection && (
+            <div className="space-y-6">
+              <div className="text-center py-4">
+                <h3 className="text-lg font-semibold text-slate-700">Select Exercise Part</h3>
+                <p className="text-sm text-slate-500 mt-2">Choose which part of the pipeline exercise you want to practice</p>
+              </div>
+              <div className="grid grid-cols-2 gap-6 max-w-2xl mx-auto">
+                <button
+                  onClick={() => handleSelectPart('AT')}
+                  className="p-8 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 hover:border-blue-400 transition-all text-center"
+                >
+                  <FileText size={40} className="mx-auto text-blue-600 mb-3" />
+                  <div className="text-xl font-bold text-blue-700 mb-1">Part 1</div>
+                  <div className="text-base text-blue-600">AT Method</div>
+                </button>
+                <button
+                  onClick={() => handleSelectPart('Matrix')}
+                  className="p-8 bg-purple-50 border-2 border-purple-200 rounded-lg hover:bg-purple-100 hover:border-purple-400 transition-all text-center"
+                >
+                  <Grid3x3 size={40} className="mx-auto text-purple-600 mb-3" />
+                  <div className="text-xl font-bold text-purple-700 mb-1">Part 2</div>
+                  <div className="text-base text-purple-600">Strategy Matrix</div>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Continue Prompt for AT Method */}
+          {!showPartSelection && selectedPart === 'AT' && showContinuePrompt && savedState && (
             <div className="text-center py-8 space-y-4">
               <div className="text-lg text-slate-700">
                 You have an unfinished exercise session.
               </div>
               <div className="text-sm text-slate-500">
-                Previous progress: {savedState.score} questions answered out of {savedState.instructions?.length || 0}
+                Previous progress: {savedState.score} correct out of {savedState.instructions?.length || 0}
               </div>
               <div className="flex gap-4 justify-center">
                 <button
-                  onClick={() => loadInstructions(true)}
+                  onClick={() => loadInstructions(true, 'AT')}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Continue Previous Session
                 </button>
                 <button
-                  onClick={() => loadInstructions(false)}
+                  onClick={() => loadInstructions(false, 'AT')}
                   className="px-6 py-2 bg-gray-200 text-slate-700 rounded-lg hover:bg-gray-300 transition-colors"
                 >
                   Start New Session
@@ -420,26 +778,28 @@ const ExerciseMode: React.FC<Props> = ({ isOpen, onClose, onLoadAsm }) => {
             </div>
           )}
 
-          {loading ? (
-            <div className="text-center py-10 text-slate-500">Loading...</div>
-          ) : showContinuePrompt ? null : showResult ? (
-            <div className="text-center py-8 space-y-6">
-              <Trophy size={64} className="mx-auto text-yellow-500" />
-              <div>
-                <h3 className="text-2xl font-bold text-slate-800">Exercise Complete!</h3>
-                <p className="text-slate-600 mt-2">
-                  You scored <span className="font-bold text-blue-600 text-xl">{score}</span> / {instructions.length}
-                </p>
+          {/* AT Method Content */}
+          {!showPartSelection && selectedPart === 'AT' && (
+            loading ? (
+              <div className="text-center py-10 text-slate-500">Loading...</div>
+            ) : showContinuePrompt ? null : showResult ? (
+              <div className="text-center py-8 space-y-6">
+                <Trophy size={64} className="mx-auto text-yellow-500" />
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-800">Exercise Complete!</h3>
+                  <p className="text-slate-600 mt-2">
+                    You scored <span className="font-bold text-blue-600 text-xl">{score}</span> / {instructions.length}
+                  </p>
+                </div>
+                <button
+                  onClick={() => loadInstructions(false, 'AT')}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
+                >
+                  Practice Again
+                </button>
               </div>
-              <button
-                onClick={() => loadInstructions(false)}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
-              >
-                Practice Again
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4">
+            ) : (
+              <div className="space-y-4">
               {/* Instructions */}
               <div className="text-sm text-slate-500 mb-4">
                 Fill in Tuse/Tnew for each instruction using AT Method. Click "View" to see an example program.
@@ -553,6 +913,202 @@ const ExerciseMode: React.FC<Props> = ({ isOpen, onClose, onLoadAsm }) => {
                 <span>Answered: {Object.values(answers).filter(a => a.tuse_rs && a.tuse_rt && a.tnew).length} / {instructions.length}</span>
               </div>
             </div>
+            )
+          )}
+
+          {/* Strategy Matrix Content */}
+          {!showPartSelection && selectedPart === 'Matrix' && (
+            loading ? (
+              <div className="text-center py-10 text-slate-500">Loading...</div>
+            ) : matrixShowContinuePrompt && matrixSavedState ? (
+              <div className="text-center py-8 space-y-4">
+                <div className="text-lg text-slate-700">
+                  You have an unfinished Strategy Matrix session.
+                </div>
+                <div className="text-sm text-slate-500">
+                  Previous progress: RS {matrixSavedState.scoreRS}/{MATRIX_ROWS_RS.length * MATRIX_COLUMNS.length},
+                  RT {matrixSavedState.scoreRT}/{MATRIX_ROWS_RT.length * MATRIX_COLUMNS.length}
+                </div>
+                <div className="flex gap-4 justify-center">
+                  <button
+                    onClick={() => loadMatrixPart(true)}
+                    className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                  >
+                    Continue Previous Session
+                  </button>
+                  <button
+                    onClick={() => loadMatrixPart(false)}
+                    className="px-6 py-2 bg-gray-200 text-slate-700 rounded-lg hover:bg-gray-300 transition-colors"
+                  >
+                    Start New Session
+                  </button>
+                </div>
+              </div>
+            ) : matrixShowContinuePrompt ? null : matrixShowResult ? (
+              <div className="text-center py-8 space-y-6">
+                <Trophy size={64} className="mx-auto text-yellow-500" />
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-800">Matrix Complete!</h3>
+                  <p className="text-slate-600 mt-2">
+                    RS: {matrixScoreRS}/{MATRIX_ROWS_RS.length * MATRIX_COLUMNS.length}, RT: {matrixScoreRT}/{MATRIX_ROWS_RT.length * MATRIX_COLUMNS.length}
+                  </p>
+                </div>
+                <button
+                  onClick={() => loadMatrixPart(false)}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 mx-auto"
+                >
+                  Practice Again
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Instructions */}
+                <div className="text-sm text-slate-500">
+                  <p>Fill in S (Stall) or F (Forward) for each cell based on Tuse and Tnew comparison.</p>
+                </div>
+
+                {/* RS Matrix */}
+                <div>
+                  <h4 className="text-lg font-semibold text-purple-700 mb-2">RS Strategy Matrix</h4>
+                  <div className="overflow-x-auto border rounded-lg">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        {/* Row 1: Stage */}
+                        <tr className="bg-purple-100">
+                          <th className="px-2 py-2 border text-sm font-semibold text-slate-700" rowSpan={3}>Tuse</th>
+                          <th className="px-4 py-2 border text-center text-sm font-semibold text-purple-800" colSpan={3}>Stage E</th>
+                          <th className="px-4 py-2 border text-center text-sm font-semibold text-purple-800" colSpan={3}>Stage M</th>
+                          <th className="px-4 py-2 border text-center text-sm font-semibold text-purple-800" colSpan={3}>Stage W</th>
+                        </tr>
+                        {/* Row 2: Component */}
+                        <tr className="bg-purple-50">
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>ALU</th>
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>DM</th>
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>PC</th>
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>ALU</th>
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>DM</th>
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>PC</th>
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>ALU</th>
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>DM</th>
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>PC</th>
+                        </tr>
+                        {/* Row 3: Tnew */}
+                        <tr className="bg-slate-100">
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=1</th>
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=2</th>
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=0</th>
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=0</th>
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=1</th>
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=0</th>
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=0</th>
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=0</th>
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=0</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {MATRIX_ROWS_RS.map(row => (
+                          <tr key={row.tuse} className="bg-white">
+                            <td className="px-2 py-2 border font-semibold text-slate-700 text-sm">{row.tuse}</td>
+                            {MATRIX_COLUMNS.map(col => (
+                              <td key={col.key} className="px-1 py-1 border text-center">
+                                <div className="flex items-center justify-center">
+                                  {renderMatrixCell('RS', col.key, row.tuse)}
+                                  {matrixSubmitted && matrixFeedbackRS[`${col.key}_${row.tuse}`] !== undefined && (
+                                    matrixFeedbackRS[`${col.key}_${row.tuse}`] ? <CheckCircle size={12} className="text-green-500 ml-1" /> : <XCircle size={12} className="text-red-500 ml-1" />
+                                  )}
+                                </div>
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* RT Matrix */}
+                <div>
+                  <h4 className="text-lg font-semibold text-green-700 mb-2">RT Strategy Matrix</h4>
+                  <div className="overflow-x-auto border rounded-lg">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        {/* Row 1: Stage */}
+                        <tr className="bg-green-100">
+                          <th className="px-2 py-2 border text-sm font-semibold text-slate-700" rowSpan={3}>Tuse</th>
+                          <th className="px-4 py-2 border text-center text-sm font-semibold text-green-800" colSpan={3}>Stage E</th>
+                          <th className="px-4 py-2 border text-center text-sm font-semibold text-green-800" colSpan={3}>Stage M</th>
+                          <th className="px-4 py-2 border text-center text-sm font-semibold text-green-800" colSpan={3}>Stage W</th>
+                        </tr>
+                        {/* Row 2: Component */}
+                        <tr className="bg-green-50">
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>ALU</th>
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>DM</th>
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>PC</th>
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>ALU</th>
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>DM</th>
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>PC</th>
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>ALU</th>
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>DM</th>
+                          <th className="px-4 py-1 border text-center text-xs font-medium text-slate-600" colSpan={1}>PC</th>
+                        </tr>
+                        {/* Row 3: Tnew */}
+                        <tr className="bg-slate-100">
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=1</th>
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=2</th>
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=0</th>
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=0</th>
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=1</th>
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=0</th>
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=0</th>
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=0</th>
+                          <th className="px-2 py-1 border text-center text-xs font-normal text-slate-500">Tnew=0</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {MATRIX_ROWS_RT.map(row => (
+                          <tr key={row.tuse} className="bg-white">
+                            <td className="px-2 py-2 border font-semibold text-slate-700 text-sm">{row.tuse}</td>
+                            {MATRIX_COLUMNS.map(col => (
+                              <td key={col.key} className="px-1 py-1 border text-center">
+                                <div className="flex items-center justify-center">
+                                  {renderMatrixCell('RT', col.key, row.tuse)}
+                                  {matrixSubmitted && matrixFeedbackRT[`${col.key}_${row.tuse}`] !== undefined && (
+                                    matrixFeedbackRT[`${col.key}_${row.tuse}`] ? <CheckCircle size={12} className="text-green-500 ml-1" /> : <XCircle size={12} className="text-red-500 ml-1" />
+                                  )}
+                                </div>
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <button
+                  onClick={checkMatrixAnswers}
+                  className="w-full py-3 mt-4 bg-purple-600 text-white rounded-lg font-bold shadow-md hover:bg-purple-700 active:scale-[0.98] transition-all"
+                >
+                  Check Answers
+                </button>
+
+                {/* Feedback after check */}
+                {matrixSubmitted && !matrixShowResult && (
+                  <div className="text-center mt-4 space-y-2">
+                    <div className="text-lg font-semibold text-slate-700">
+                      RS: {matrixScoreRS}/{MATRIX_ROWS_RS.length * MATRIX_COLUMNS.length} correct,
+                      RT: {matrixScoreRT}/{MATRIX_ROWS_RT.length * MATRIX_COLUMNS.length} correct
+                    </div>
+                    {(matrixScoreRS < MATRIX_ROWS_RS.length * MATRIX_COLUMNS.length || matrixScoreRT < MATRIX_ROWS_RT.length * MATRIX_COLUMNS.length) && (
+                      <div className="text-sm text-slate-500">
+                        Fix the incorrect cells and check again
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
           )}
         </div>
       </div>
