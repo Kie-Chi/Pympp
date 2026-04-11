@@ -8,9 +8,11 @@ import PipelineVisualizer from './components/PipelineVisualizer';
 import RegisterFile from './components/RegisterFile';
 import MemoryView from './components/MemoryView';
 import ConfigPanel from './components/ConfigPanel';
-import { HelpCircle, BookOpen, GraduationCap } from 'lucide-react';
+import { HelpCircle, BookOpen, GraduationCap, Pencil, Users } from 'lucide-react';
 import InstructionReference from './components/InstructionReference';
 import QuizMode from './components/QuizMode';
+import ExerciseMode from './components/ExerciseMode';
+import AdminPanel from './components/AdminPanel';
 
 const DEFAULT_ASM = `# Bubble Sort Implementation
 # Initialize array in memory
@@ -86,6 +88,8 @@ function App() {
   const [isAssembled, setIsAssembled] = useState(false);
   const [showInstrRef, setShowInstrRef] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
+  const [showExercise, setShowExercise] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
   const [detailMode, setDetailMode] = useState(appConfig.ui.showRegisterTimingDetail);
 
   const handleLoad = async () => {
@@ -217,6 +221,34 @@ function App() {
       setError(null);
   };
 
+  // Load ASM from external source (e.g., ExerciseMode)
+  const handleLoadAsm = async (source: string) => {
+    setAsmSource(source);
+    // Auto-assemble after loading
+    setLoading(true);
+    setError(null);
+    try {
+      await loadProgram(source);
+      const mapRes = await getSourceMap();
+      setSourceMap(mapRes.source_map);
+      const textStart = parseInt(mapRes.text_start, 16);
+      const textEnd = parseInt(mapRes.text_end, 16);
+      setTextSegment({ start: textStart, end: textEnd });
+
+      const res = await resetSimulator();
+      if (res.success) {
+        setIsAssembled(true);
+        const snap = await getSnapshot(0).catch(() => null);
+        if (snap) setSnapshot(snap);
+      }
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to load';
+      setError(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -304,12 +336,30 @@ function App() {
                 </button>
             </div>
             <div className="relative group ml-1">
-                <button 
+                <button
                     onClick={() => setShowQuiz(true)}
                     className="cursor-pointer p-1 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-full transition-colors"
                     title="Quiz Mode"
                 >
                     <GraduationCap size={18} />
+                </button>
+            </div>
+            <div className="relative group ml-1">
+                <button
+                    onClick={() => setShowExercise(true)}
+                    className="cursor-pointer p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                    title="Exercise Mode"
+                >
+                    <Pencil size={18} />
+                </button>
+            </div>
+            <div className="relative group ml-1">
+                <button
+                    onClick={() => setShowAdmin(true)}
+                    className="cursor-pointer p-1 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-full transition-colors"
+                    title="Admin Dashboard"
+                >
+                    <Users size={18} />
                 </button>
             </div>
             <ConfigPanel className="ml-1" />
@@ -390,6 +440,12 @@ function App() {
 
       {/* Quiz Mode Modal */}
       <QuizMode isOpen={showQuiz} onClose={() => setShowQuiz(false)} />
+
+      {/* Exercise Mode Modal */}
+      <ExerciseMode isOpen={showExercise} onClose={() => setShowExercise(false)} onLoadAsm={handleLoadAsm} />
+
+      {/* Admin Panel */}
+      <AdminPanel isOpen={showAdmin} onClose={() => setShowAdmin(false)} />
     </div>
   );
 }

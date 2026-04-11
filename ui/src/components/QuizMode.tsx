@@ -35,6 +35,20 @@ const REVERSE_STAGE_MAP: Record<string, number | null> = {
   'UNKNOWN': -99
 };
 
+const STORAGE_KEY = 'quiz_state';
+
+interface SavedState {
+  instructions: Instruction[];
+  currentIdx: number;
+  answers: { tuse_rs: string; tuse_rt: string; tnew: string };
+  score: number;
+  quizSessionId: string | null;
+  answeredCount: number;  // Number of questions already answered
+  savedAt: number;  // Timestamp when state was saved
+}
+
+const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 // 将数字转换为带Stage标签的格式用于显示
 const getStageLabel = (value: string): string => {
   const labels: Record<string, string> = {
@@ -65,24 +79,52 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
     tuse_rt: string;
     tnew: string;
   }>({ tuse_rs: '', tuse_rt: '', tnew: '' });
-  
+
   const [feedback, setFeedback] = useState<{
     tuse_rs?: boolean;
     tuse_rt?: boolean;
     tnew?: boolean;
   } | null>(null);
-  
+
   const [correctAnswers, setCorrectAnswers] = useState<{
     tuse_rs: string;
     tuse_rt: string;
     tnew: string;
   } | null>(null);
-  
+
   const [hasSubmitted, setHasSubmitted] = useState(false);
+
+  // Continue prompt state
+  const [showContinuePrompt, setShowContinuePrompt] = useState(false);
+  const [savedState, setSavedState] = useState<SavedState | null>(null);
 
   useEffect(() => {
     if (isOpen) {
-      loadInstructions();
+      // Check for saved state
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const state: SavedState = JSON.parse(saved);
+          // Check if session has expired
+          if (state.savedAt && Date.now() - state.savedAt > SESSION_EXPIRY_MS) {
+            // Session expired - end it on backend and clear localStorage
+            if (state.quizSessionId) {
+              endQuizSession(state.quizSessionId, state.score).catch(err => {
+                console.error('Failed to end expired quiz session:', err);
+              });
+            }
+            localStorage.removeItem(STORAGE_KEY);
+            loadInstructions(false);
+          } else {
+            setSavedState(state);
+            setShowContinuePrompt(true);
+          }
+        } catch {
+          loadInstructions(false);
+        }
+      } else {
+        loadInstructions(false);
+      }
     }
   }, [isOpen]);
 
@@ -124,8 +166,34 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
     }
   }, [currentIdx, instructions]);
 
-  const loadInstructions = async () => {
+  const loadInstructions = async (restoreState: boolean = false) => {
     setLoading(true);
+    setShowContinuePrompt(false);
+
+    if (restoreState && savedState) {
+      // Restore saved state - continue previous session
+      setInstructions(savedState.instructions);
+      setCurrentIdx(savedState.currentIdx);
+      setAnswers(savedState.answers);
+      setScore(savedState.score);
+      setQuizSessionId(savedState.quizSessionId);
+      setShowResult(false);
+      setFeedback(null);
+      setCorrectAnswers(null);
+      setHasSubmitted(false);
+      setLoading(false);
+      return;
+    }
+
+    // If starting new session, end the previous one first (if exists)
+    if (savedState?.quizSessionId) {
+      endQuizSession(savedState.quizSessionId, savedState.score).catch(err => {
+        console.error('Failed to end previous quiz session:', err);
+      });
+      // Clear saved state since we're starting fresh
+      localStorage.removeItem(STORAGE_KEY);
+    }
+
     try {
       const res = await fetch('/resources/instructions.json');
       const data = await res.json();
@@ -149,6 +217,22 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
       setLoading(false);
     }
   };
+
+  // Save state whenever it changes (but not after quiz is complete)
+  useEffect(() => {
+    if (!loading && instructions.length > 0 && !showResult && !showContinuePrompt) {
+      const state: SavedState = {
+        instructions,
+        currentIdx,
+        answers,
+        score,
+        quizSessionId,
+        answeredCount: currentIdx,
+        savedAt: Date.now(),  // Add timestamp for expiry check
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+  }, [instructions, currentIdx, answers, score, quizSessionId, loading, showResult, showContinuePrompt]);
 
   const resetQuiz = () => {
     setCurrentIdx(0);
@@ -239,6 +323,8 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
   const nextQuestion = () => {
     if (currentIdx + 1 >= instructions.length) {
       setShowResult(true);
+      // Clear saved state when quiz is complete
+      localStorage.removeItem(STORAGE_KEY);
       // End quiz session on backend
       if (quizSessionId) {
         endQuizSession(quizSessionId, score).catch(err => {
@@ -254,15 +340,12 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
     }
   };
 
-  // Handle closing quiz modal - end session if not finished
+  // Handle closing quiz modal - keep session in_progress for potential continuation
   const handleClose = () => {
-    // If quiz session exists and not finished, end it
-    // This captures incomplete quizzes - user answered some questions but quit early
-    if (quizSessionId && !showResult) {
-      endQuizSession(quizSessionId, score).catch(err => {
-        console.error('Failed to end quiz session on close:', err);
-      });
-    }
+    // Don't end session here - user might want to continue later
+    // Session will be ended when:
+    // 1. User completes the quiz (showResult)
+    // 2. User explicitly chooses "Start New Session"
     onClose();
   };
 
@@ -352,9 +435,35 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
         </div>
 
         <div className="p-8 overflow-y-auto flex-1">
+          {/* Continue Prompt */}
+          {showContinuePrompt && savedState && (
+            <div className="text-center py-8 space-y-4">
+              <div className="text-lg text-slate-700">
+                You have an unfinished quiz session.
+              </div>
+              <div className="text-sm text-slate-500">
+                Previous progress: Question {savedState.currentIdx + 1} of {savedState.instructions?.length || 0}, Score: {savedState.score}
+              </div>
+              <div className="flex gap-4 justify-center">
+                <button
+                  onClick={() => loadInstructions(true)}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  Continue Previous Session
+                </button>
+                <button
+                  onClick={() => loadInstructions(false)}
+                  className="px-6 py-2 bg-gray-200 text-slate-700 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Start New Session
+                </button>
+              </div>
+            </div>
+          )}
+
           {loading ? (
             <div className="text-center py-10 text-slate-500">Loading questions...</div>
-          ) : showResult ? (
+          ) : showContinuePrompt ? null : showResult ? (
             <div className="text-center py-8 space-y-6">
               <Trophy size={64} className="mx-auto text-yellow-500 animate-bounce" />
               <div>

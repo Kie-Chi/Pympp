@@ -149,3 +149,82 @@ export interface QuizStatsResponse {
   accuracy_rate: number;
   most_wrong_instructions: string[];
 }
+
+// === Exercise API Types ===
+
+export interface ExerciseStartRequest {
+  total_questions: number;
+  part: number;
+}
+
+export interface ExerciseStartResponse {
+  exercise_session_id: string;
+  part: number;
+  started_at: string;
+}
+
+export interface ExerciseAnswerRequest {
+  exercise_session_id: string;
+  instruction_name: string;
+  question_index: number;
+  part: number;
+  user_tuse_rs: number | null;
+  user_tuse_rt: number | null;
+  user_tnew: number | null;
+  correct_tuse_rs: string;
+  correct_tuse_rt: string;
+  correct_tnew: string;
+  matrix_row: number | null;
+  matrix_col: number | null;
+  user_answer: string;
+  correct_answer: string;
+  is_correct: boolean;
+}
+
+export interface ExerciseAnswerResponse {
+  record_id: number;
+  success: boolean;
+}
+
+export interface ExerciseSessionSummary {
+  exercise_session_id: string;
+  session_id: string;
+  total_questions: number;
+  actual_answered: number;
+  correct_count: number;
+  part: number;
+  started_at: string | null;
+  ended_at: string | null;
+}
+
+export interface ExerciseRecordItem {
+  id: number;
+  instruction_name: string;
+  question_index: number;
+  part: number;
+  user_tuse_rs: number | null;
+  user_tuse_rt: number | null;
+  user_tnew: number | null;
+  correct_tuse_rs: string;
+  correct_tuse_rt: string;
+  correct_tnew: string;
+  matrix_row: number | null;
+  matrix_col: number | null;
+  user_answer: string;
+  correct_answer: string;
+  is_correct: boolean;
+  created_at: string | null;
+}
+
+export interface ExerciseHistoryResponse {
+  sessions: ExerciseSessionSummary[];
+  records: ExerciseRecordItem[];
+}
+
+export interface ExerciseStatsResponse {
+  total_sessions: number;
+  total_questions: number;
+  correct_count: number;
+  accuracy_rate: number;
+  most_wrong_instructions: string[];
+}

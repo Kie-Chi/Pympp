@@ -2,7 +2,9 @@ import axios from 'axios';
 import {
   LoadResponse, ResetResponse, Snapshot, CycleInfo, MemoryPageResponse,
   QuizStartResponse, QuizAnswerRequest, QuizAnswerResponse,
-  QuizSessionSummary, QuizHistoryResponse, QuizStatsResponse
+  QuizSessionSummary, QuizHistoryResponse, QuizStatsResponse,
+  ExerciseStartResponse, ExerciseAnswerRequest, ExerciseAnswerResponse,
+  ExerciseSessionSummary, ExerciseHistoryResponse, ExerciseStatsResponse
 } from '../types/schema';
 
 const generateSessionId = (): string => {
@@ -146,5 +148,64 @@ export const getQuizHistory = async (): Promise<QuizHistoryResponse> => {
 
 export const getQuizStats = async (): Promise<QuizStatsResponse> => {
   const res = await api.get<QuizStatsResponse>('/quiz/stats');
+  return res.data;
+};
+
+// === Exercise API ===
+
+export const startExerciseSession = async (totalQuestions: number, part: number = 1): Promise<ExerciseStartResponse> => {
+  const res = await api.post<ExerciseStartResponse>('/exercise/start', { total_questions: totalQuestions, part });
+  return res.data;
+};
+
+export const recordExerciseAnswer = async (record: ExerciseAnswerRequest): Promise<ExerciseAnswerResponse> => {
+  const res = await api.post<ExerciseAnswerResponse>('/exercise/record_answer', record);
+  return res.data;
+};
+
+export const endExerciseSession = async (exerciseSessionId: string): Promise<ExerciseSessionSummary> => {
+  const res = await api.post<ExerciseSessionSummary>(`/exercise/end?exercise_session_id=${exerciseSessionId}`);
+  return res.data;
+};
+
+export const getExerciseHistory = async (): Promise<ExerciseHistoryResponse> => {
+  const res = await api.get<ExerciseHistoryResponse>('/exercise/history');
+  return res.data;
+};
+
+export const getExerciseStats = async (): Promise<ExerciseStatsResponse> => {
+  const res = await api.get<ExerciseStatsResponse>('/exercise/stats');
+  return res.data;
+};
+
+// === Admin APIs ===
+
+export const getQuizAdminSessions = async (): Promise<any[]> => {
+  const res = await api.get<any[]>('/quiz/admin/sessions');
+  return res.data;
+};
+
+export const getQuizAdminStats = async (): Promise<QuizStatsResponse> => {
+  const res = await api.get<QuizStatsResponse>('/quiz/admin/stats');
+  return res.data;
+};
+
+export const getQuizAdminRecords = async (limit: number = 100): Promise<any[]> => {
+  const res = await api.get<any[]>('/quiz/admin/records', { params: { limit } });
+  return res.data;
+};
+
+export const getExerciseAdminSessions = async (): Promise<any[]> => {
+  const res = await api.get<any[]>('/exercise/admin/sessions');
+  return res.data;
+};
+
+export const getExerciseAdminStats = async (): Promise<ExerciseStatsResponse> => {
+  const res = await api.get<ExerciseStatsResponse>('/exercise/admin/stats');
+  return res.data;
+};
+
+export const getExerciseAdminRecords = async (limit: number = 100): Promise<any[]> => {
+  const res = await api.get<any[]>('/exercise/admin/records', { params: { limit } });
   return res.data;
 };
