@@ -23,18 +23,14 @@ const MemoryView: React.FC<Props> = ({ cycle, writtenAddresses = [], memoryChang
   const [loading, setLoading] = useState(false);
   const [animatingAddresses, setAnimatingAddresses] = useState<Set<string>>(new Set());
   
-  // Handle change animation
+  // Handle change animation - keep it visible for the current cycle
   useEffect(() => {
     if (appConfig.ui.enableChangeVisualization && Object.keys(memoryChanges).length > 0) {
       const changedAddrs = new Set(Object.keys(memoryChanges));
       setAnimatingAddresses(changedAddrs);
-      
-      // Clear animation after 2 seconds
-      const timer = setTimeout(() => {
-        setAnimatingAddresses(new Set());
-      }, 2000);
-      
-      return () => clearTimeout(timer);
+    } else {
+      // Clear animation when no changes (new cycle without changes)
+      setAnimatingAddresses(new Set());
     }
   }, [memoryChanges]);
 

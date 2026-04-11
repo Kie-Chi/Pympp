@@ -1,48 +1,56 @@
 [
   {
     "name": "add",
-    "syntax": "add $d, $s, $t",
-    "description": "Add Word",
+    "syntax": "add $rd, $rs, $rt",
+    "description": "Add Word: $rd = $rs + $rt",
     "tuse_rs": [1],
     "tuse_rt": [1],
-    "tnew": [2]
+    "tnew": [1]
   },
   {
     "name": "sub",
-    "syntax": "sub $d, $s, $t",
-    "description": "Subtract Word",
+    "syntax": "sub $rd, $rs, $rt",
+    "description": "Subtract Word: $rd = $rs - $rt",
     "tuse_rs": [1],
     "tuse_rt": [1],
-    "tnew": [2]
+    "tnew": [1]
   },
   {
     "name": "ori",
-    "syntax": "ori $t, $s, imm",
-    "description": "Or Immediate",
+    "syntax": "ori $rt, $rs, imm",
+    "description": "Or Immediate: $rt = $rs | imm",
+    "tuse_rs": [1],
+    "tuse_rt": [null],
+    "tnew": [1]
+  },
+  {
+    "name": "lui",
+    "syntax": "lui $rt, imm",
+    "description": "Load Upper Immediate: $rt = imm << 16",
+    "tuse_rs": [null],
+    "tuse_rt": [null],
+    "tnew": [1]
+  },
+  {
+    "name": "lw",
+    "syntax": "lw $rt, offset($rs)",
+    "description": "Load Word: $rt = MEM[$rs + offset]",
     "tuse_rs": [1],
     "tuse_rt": [null],
     "tnew": [2]
   },
   {
-    "name": "lw",
-    "syntax": "lw $t, offset($s)",
-    "description": "Load Word",
-    "tuse_rs": [1],
-    "tuse_rt": [null],
-    "tnew": [3]
-  },
-  {
     "name": "sw",
-    "syntax": "sw $t, offset($s)",
-    "description": "Store Word",
+    "syntax": "sw $rt, offset($rs)",
+    "description": "Store Word: MEM[$rs + offset] = $rt",
     "tuse_rs": [1],
     "tuse_rt": [2],
     "tnew": [null]
   },
   {
     "name": "beq",
-    "syntax": "beq $s, $t, label",
-    "description": "Branch on Equal",
+    "syntax": "beq $rs, $rt, label",
+    "description": "Branch on Equal: if $rs == $rt goto label",
     "tuse_rs": [0],
     "tuse_rt": [0],
     "tnew": [null]
@@ -50,25 +58,17 @@
   {
     "name": "jal",
     "syntax": "jal label",
-    "description": "Jump and Link",
+    "description": "Jump and Link: $ra = PC+8; goto label",
     "tuse_rs": [null],
     "tuse_rt": [null],
-    "tnew": [1, 2]
+    "tnew": [0]
   },
   {
     "name": "jr",
-    "syntax": "jr $s",
-    "description": "Jump Register",
+    "syntax": "jr $rs",
+    "description": "Jump Register: goto $rs",
     "tuse_rs": [0],
     "tuse_rt": [null],
     "tnew": [null]
-  },
-  {
-    "name": "jalx",
-    "syntax": "jalx rs, rt, offset",
-    "description": "descriptions/jalx.md",
-    "tuse_rs": [0],
-    "tuse_rt": [0],
-    "tnew": [1, 2]
   }
 ]

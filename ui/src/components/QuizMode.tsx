@@ -15,15 +15,34 @@ interface Props {
   onClose: () => void;
 }
 
-const STAGE_OPTIONS = ['D', 'E', 'M', 'W', '-', 'UNKNOWN'];
+const STAGE_OPTIONS = [
+  { value: '0', label: '0 (Stage D)' },
+  { value: '1', label: '1 (Stage E)' },
+  { value: '2', label: '2 (Stage M)' },
+  { value: '3', label: '3 (Stage W)' },
+  { value: '-', label: '- (Not Used)' },
+  { value: 'UNKNOWN', label: 'UNKNOWN' },
+];
 
 const REVERSE_STAGE_MAP: Record<string, number | null> = {
-  'D': 0,
-  'E': 1,
-  'M': 2,
-  'W': 3,
+  '0': 0,
+  '1': 1,
+  '2': 2,
+  '3': 3,
   '-': null,
   'UNKNOWN': -99
+};
+
+// 将数字转换为带Stage标签的格式用于显示
+const getStageLabel = (value: string): string => {
+  const labels: Record<string, string> = {
+    '0': '0 (Stage D)',
+    '1': '1 (Stage E)',
+    '2': '2 (Stage M)',
+    '3': '3 (Stage W)',
+    '-': '- (Not Used)',
+  };
+  return labels[value] || value;
 };
 
 const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
@@ -144,17 +163,13 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
       const stages = values
         .map(v => {
           if (v === null) return null;
-          if (v === 0) return 'D';
-          if (v === 1) return 'E';
-          if (v === 2) return 'M';
-          if (v === 3) return 'W';
-          return null;
+          return String(v);  // 直接返回数字字符串
         })
         .filter(s => s !== null);
-      
+
       // If no valid stages, return '-'
       if (stages.length === 0) return '-';
-      
+
       // Return all valid stages joined with ' / '
       return stages.join(' / ');
     };
@@ -220,7 +235,7 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
           >
             <option value="" disabled>Select</option>
             {STAGE_OPTIONS.map(opt => (
-              <option key={opt} value={opt}>{opt}</option>
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -232,12 +247,18 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
         {isWrong && correctAnswer && (
           <div className="text-xs text-green-600 font-semibold mt-1 flex items-center gap-1">
             <span className="text-slate-500">✓</span>
-            <span>正确答案: <span className="font-mono">{correctAnswer}</span></span>
+            <span>正确答案: <span className="font-mono">{
+              correctAnswer.includes(' / ')
+                ? correctAnswer.split(' / ').map(getStageLabel).join(' / ')
+                : getStageLabel(correctAnswer)
+            }</span></span>
           </div>
         )}
         {otherAnswers && (
           <div className="text-xs text-slate-500 mt-1">
-            其他可接受的答案: <span className="font-mono">{otherAnswers}</span>
+            其他可接受的答案: <span className="font-mono">{
+              otherAnswers.split(' / ').map(getStageLabel).join(' / ')
+            }</span>
           </div>
         )}
       </div>

@@ -30,18 +30,14 @@ const RegisterFile: React.FC<Props> = ({ registers, writtenRegisters = [], regis
     }
   }, [writtenRegisters]);
 
-  // Handle change animation
+  // Handle change animation - keep it visible for the current cycle
   useEffect(() => {
     if (appConfig.ui.enableChangeVisualization && Object.keys(registerChanges).length > 0) {
       const changedRegIds = Object.keys(registerChanges).map(Number);
       setAnimatingRegisters(new Set(changedRegIds));
-      
-      // Clear animation after 2 seconds
-      const timer = setTimeout(() => {
-        setAnimatingRegisters(new Set());
-      }, 2000);
-      
-      return () => clearTimeout(timer);
+    } else {
+      // Clear animation when no changes (new cycle without changes)
+      setAnimatingRegisters(new Set());
     }
   }, [registerChanges]);
 

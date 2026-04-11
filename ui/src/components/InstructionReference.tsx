@@ -8,24 +8,24 @@ interface Props {
 
 const SUPPORTED_INSTRUCTIONS = [
   { category: 'Arithmetic', items: [
-    { name: 'add', syntax: 'add $d, $s, $t', desc: '$d = $s + $t', tnew: 'M', tuse: 's:E, t:E' },
-    { name: 'sub', syntax: 'sub $d, $s, $t', desc: '$d = $s - $t', tnew: 'M', tuse: 's:E, t:E' },
+    { name: 'add', syntax: 'add $rd, $rs, $rt', desc: '$rd = $rs + $rt', tnew: '1', tnewNote: 'Ready in EM Reg', tuse: 'rs:1(E), rt:1(E)' },
+    { name: 'sub', syntax: 'sub $rd, $rs, $rt', desc: '$rd = $rs - $rt', tnew: '1', tnewNote: 'Ready in EM Reg', tuse: 'rs:1(E), rt:1(E)' },
   ]},
   { category: 'Logical / Immediate', items: [
-    { name: 'ori', syntax: 'ori $t, $s, imm', desc: '$t = $s | imm', tnew: 'M', tuse: 's:E' },
-    { name: 'lui', syntax: 'lui $t, imm', desc: '$t = imm << 16', tnew: 'M', tuse: '-' },
+    { name: 'ori', syntax: 'ori $rt, $rs, imm', desc: '$rt = $rs | imm', tnew: '1', tnewNote: 'Ready in EM Reg', tuse: 'rs:1(E)' },
+    { name: 'lui', syntax: 'lui $rt, imm', desc: '$rt = imm << 16', tnew: '1', tnewNote: 'Ready in EM Reg', tuse: '-' },
   ]},
   { category: 'Memory', items: [
-    { name: 'lw', syntax: 'lw $t, offset($s)', desc: '$t = MEM[$s + offset]', tnew: 'W', tuse: 's:E' },
-    { name: 'sw', syntax: 'sw $t, offset($s)', desc: 'MEM[$s + offset] = $t', tnew: '-', tuse: 's:E, t:M' },
+    { name: 'lw', syntax: 'lw $rt, offset($rs)', desc: '$rt = MEM[$rs + offset]', tnew: '2', tnewNote: 'Ready in MW Reg', tuse: 'rs:1(E)' },
+    { name: 'sw', syntax: 'sw $rt, offset($rs)', desc: 'MEM[$rs + offset] = $rt', tnew: '-', tnewNote: '', tuse: 'rs:1(E), rt:2(M)' },
   ]},
   { category: 'Branch & Jump', items: [
-    { name: 'beq', syntax: 'beq $s, $t, label', desc: 'if $s == $t goto label', tnew: '-', tuse: 's:D, t:D' },
-    { name: 'jal', syntax: 'jal label', desc: '$ra = PC+8; goto label', tnew: 'E', tuse: '-' },
-    { name: 'jr', syntax: 'jr $s', desc: 'goto $s', tnew: '-', tuse: 's:D' },
+    { name: 'beq', syntax: 'beq $rs, $rt, label', desc: 'if $rs == $rt goto label', tnew: '-', tnewNote: '', tuse: 'rs:0(D), rt:0(D)' },
+    { name: 'jal', syntax: 'jal label', desc: '$ra = PC+8; goto label', tnew: '0', tnewNote: 'Ready in DE Reg', tuse: '-' },
+    { name: 'jr', syntax: 'jr $rs', desc: 'goto $rs', tnew: '-', tnewNote: '', tuse: 'rs:0(D)' },
   ]},
   { category: 'Other', items: [
-    { name: 'nop', syntax: 'nop', desc: 'No operation', tnew: '-', tuse: '-' },
+    { name: 'nop', syntax: 'nop', desc: 'No operation', tnew: '-', tnewNote: '', tuse: '-' },
   ]},
 ];
 
@@ -67,7 +67,7 @@ const InstructionReference: React.FC<Props> = ({ isOpen, onClose }) => {
                     Tuse (Time Use)
                   </h4>
                   <p className="text-sm text-slate-600 mb-3">
-                    The number of cycles when a source operand is needed.
+                    The number of cycles after D stage when a source operand is needed.
                   </p>
                   <ul className="text-xs space-y-2 bg-slate-50 p-3 rounded border border-gray-100">
                     <li className="flex gap-2"><span className="font-mono font-bold text-slate-700 w-16">Tuse = 0</span> <span>Used in <strong>D</strong> stage</span></li>
@@ -81,12 +81,12 @@ const InstructionReference: React.FC<Props> = ({ isOpen, onClose }) => {
                     Tnew (Time New)
                   </h4>
                   <p className="text-sm text-slate-600 mb-3">
-                    The stage where the result is produced and ready for forwarding.
+                    The number of cycles after D stage when the result is ready for forwarding.
                   </p>
                   <ul className="text-xs space-y-2 bg-slate-50 p-3 rounded border border-gray-100">
-                    <li className="flex gap-2"><span className="font-mono font-bold text-slate-700 w-16">Tnew = E</span> <span>Ready in <strong>E</strong> stage</span></li>
-                    <li className="flex gap-2"><span className="font-mono font-bold text-slate-700 w-16">Tnew = M</span> <span>Ready in <strong>M</strong> stage</span></li>
-                    <li className="flex gap-2"><span className="font-mono font-bold text-slate-700 w-16">Tnew = W</span> <span>Ready in <strong>W</strong> stage</span></li>
+                    <li className="flex gap-2"><span className="font-mono font-bold text-slate-700 w-16">Tnew = 0</span> <span>Ready in <strong>DE Reg</strong></span></li>
+                    <li className="flex gap-2"><span className="font-mono font-bold text-slate-700 w-16">Tnew = 1</span> <span>Ready in <strong>EM Reg</strong></span></li>
+                    <li className="flex gap-2"><span className="font-mono font-bold text-slate-700 w-16">Tnew = 2</span> <span>Ready in <strong>MW Reg</strong></span></li>
                   </ul>
                 </div>
               </div>
@@ -121,7 +121,7 @@ const InstructionReference: React.FC<Props> = ({ isOpen, onClose }) => {
                                 )}
                                 {instr.tnew !== '-' && (
                                   <span className="text-[10px] font-mono bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-100" title="Tnew">
-                                    Tnew: {instr.tnew}
+                                    Tnew: {instr.tnew}{instr.tnewNote ? ` (${instr.tnewNote})` : ''}
                                   </span>
                                 )}
                               </div>
