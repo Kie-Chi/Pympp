@@ -127,6 +127,26 @@ class CPU:
     def log_behavior(self, b):
         self.current_behaviors.append(b)
 
+    def _is_pipeline_empty(self) -> bool:
+        for s in self.slots.values():
+            if s is not None:
+                return False
+        return True
+
+    def _is_pc_out_of_bounds(self) -> bool:
+        idx = (self.pc - 0x3000) // 4
+        return not (0 <= idx < len(self.imem))
+
+    def _is_last_snapshot_empty(self) -> bool:
+        """Check if the last snapshot shows an empty pipeline"""
+        if not self.history:
+            return False
+        last_snap = self.history[-1]
+        for stage_info in last_snap["pipeline"].values():
+            if stage_info is not None:
+                return False
+        return True
+
     def step(self):
         self.cycle += 1
         curpc = self.pc

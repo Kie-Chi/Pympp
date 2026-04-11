@@ -62,18 +62,9 @@ class Simulator:
     def is_finished(self) -> bool:
         if not self.cpu:
             return True
-
-        idx = (self.cpu.pc - 0x3000) // 4
-        pc_out_of_bounds = not (0 <= idx < len(self.cpu.imem))
-        
-        # Check pipeline empty
-        pipeline_empty = True
-        for s in self.cpu.slots.values():
-            if s is not None:
-                pipeline_empty = False
-                break
-        
-        return pc_out_of_bounds and pipeline_empty
+        # Only finished when: PC out of bounds, pipeline empty, AND last snapshot shows empty pipeline
+        # This allows user to step one more time after pipeline becomes empty
+        return self.cpu._is_pc_out_of_bounds() and self.cpu._is_pipeline_empty() and self.cpu._is_last_snapshot_empty()
 
     def ensure_cpu(self):
         if not self.cpu:
@@ -337,23 +328,14 @@ def continue_exec(manager: Simulator = Depends(get_simulator)):
 @app.post("/run_until_end", response_model=List[SnapshotSchema])
 def run_until_end(max_cycles: int = 1000, manager: Simulator = Depends(get_simulator)):
     manager.ensure_cpu()
-    
+
     # Run loop
     for _ in range(max_cycles):
-        idx = (manager.cpu.pc - 0x3000) // 4
-        pc_out_of_bounds = not (0 <= idx < len(manager.cpu.imem))
-        
-        pipeline_empty = True
-        for s in manager.cpu.slots.values():
-            if s is not None:
-                pipeline_empty = False
-                break
-        
-        if pc_out_of_bounds and pipeline_empty:
+        if manager.is_finished():
             break
-            
+
         manager.cpu.step()
-        
+
     manager.display_cycle = manager.cpu.cycle
     return [_to_snapshot_schema(snap) for snap in manager.cpu.history]
 
