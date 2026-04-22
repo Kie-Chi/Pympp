@@ -1,4 +1,3 @@
-from venv import logger
 from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -6,7 +5,7 @@ from typing import List, Dict, Any, Optional
 from ..cpu import CPU
 from .assembler import assemble
 from ..util.type import hex32
-from ..base import Stage
+from ..base import Stage, Word
 from ..log import get_logger
 from .schema import (
     LoadResponse, ResetResponse, CycleInfo, MemoryPageResponse,
@@ -60,13 +59,30 @@ class Simulator:
         self.cpu: Optional[CPU] = None
         self.source_map: Dict[str, int] = {}
         self.asm_source: str = ""
+        self.initial_memory: Optional[Dict[str, str]] = None
+        self.initial_registers: Optional[Dict[str, str]] = None
         self.display_cycle: int = 0
         self.last_access: float = time.time()
 
-    def load(self, asm_source: str):
+    def load(self, asm_source: str, initial_memory: Optional[Dict[str, str]] = None, initial_registers: Optional[Dict[str, str]] = None):
         self.asm_source = asm_source
+        self.initial_memory = initial_memory
+        self.initial_registers = initial_registers
         machine_codes, source_map = assemble(asm_source)
         self.cpu = CPU(machine_codes)
+        
+        if initial_registers:
+            for reg_name, val_hex in initial_registers.items():
+                if reg_name in REG_NAMES:
+                    reg_idx = REG_NAMES.index(reg_name)
+                else:
+                    reg_idx = int(reg_name)
+                self.cpu.regs.regs[reg_idx] = Word(int(val_hex, 16))
+                
+        if initial_memory:
+            for addr_hex, val_hex in initial_memory.items():
+                self.cpu.dmem.data[int(addr_hex, 16)] = Word(int(val_hex, 16))
+
         self.source_map = source_map
         self.display_cycle = 0
         self.last_access = time.time()
@@ -144,6 +160,8 @@ def get_simulator(x_session_id: Optional[str] = Header(None, alias="X-Session-ID
 
 class LoadRequest(BaseModel):
     asm_source: str
+    initial_memory: Optional[Dict[str, str]] = None
+    initial_registers: Optional[Dict[str, str]] = None
 
 def _to_snapshot_schema(snap: Dict[str, Any], outofbound: bool = False) -> SnapshotSchema:
     pipeline_data = {}
@@ -282,7 +300,7 @@ def session_info():
 @app.post("/load_program", response_model=LoadResponse)
 def load_program(req: LoadRequest, manager: Simulator = Depends(get_simulator)):
     try:
-        manager.load(req.asm_source)
+        manager.load(req.asm_source, req.initial_memory, req.initial_registers)
         return LoadResponse(success=True, message="Program loaded and simulator reset.")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -355,7 +373,7 @@ def run_until_end(max_cycles: int = 1000, manager: Simulator = Depends(get_simul
 @app.post("/reset", response_model=ResetResponse)
 def reset(manager: Simulator = Depends(get_simulator)):
     if manager.asm_source:
-        manager.load(manager.asm_source)
+        manager.load(manager.asm_source, manager.initial_memory, manager.initial_registers)
     else:
         raise HTTPException(status_code=400, detail="No program to reset")
     return ResetResponse(success=True, message="Simulator reset with the current program.")
