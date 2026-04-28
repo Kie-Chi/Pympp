@@ -196,6 +196,11 @@ class EventsSchema(BaseModel):
     register_changes: Optional[Dict[str, ChangeSchema]] = None
     memory_changes: Optional[Dict[str, ChangeSchema]] = None
 
+class TimerSchema(BaseModel):
+    ctrl: str
+    preset: str
+    count: str
+
 class SnapshotSchema(BaseModel):
     outofbound: bool = False # if the cursor out of cycle bounds
     cycle: int
@@ -203,6 +208,7 @@ class SnapshotSchema(BaseModel):
     pipeline: Dict[str, Optional[PipelineStageSchema]]
     registers: Dict[str, RegisterSchema]
     memory: Dict[str, str]
+    timers: Optional[Dict[str, TimerSchema]] = None
     events: EventsSchema
 
 class LoadResponse(BaseModel):

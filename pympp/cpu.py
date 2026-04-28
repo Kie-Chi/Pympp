@@ -22,6 +22,73 @@ class Snapshot:
     def to_dict(self):
         return asdict(self)
 
+class Timer:
+    def __init__(self, cpu, base_addr):
+        self.cpu = cpu
+        self.base_addr = base_addr
+        self.ctrl = 0
+        self.preset = 0
+        self.count = 0
+        self.state = 0  # 0: IDLE, 1: LOAD, 2: CNT, 3: INT
+        self._irq = False
+
+    def copy(self):
+        t = Timer(self.cpu, self.base_addr)
+        t.ctrl = self.ctrl
+        t.preset = self.preset
+        t.count = self.count
+        t.state = self.state
+        t._irq = self._irq
+        return t
+
+    def read(self, addr: int) -> int:
+        offset = addr - self.base_addr
+        if offset == 0x0:
+            return self.ctrl
+        elif offset == 0x4:
+            return self.preset
+        elif offset == 0x8:
+            return self.count
+        return 0
+
+    def write(self, addr: int, val: int):
+        offset = addr - self.base_addr
+        if offset == 0x0:
+            self.ctrl = val
+        elif offset == 0x4:
+            self.preset = val
+        elif offset == 0x8:
+            self.count = val
+
+    def step(self):
+        if self.state == 0:  # IDLE
+            if self.ctrl & 1:
+                self.state = 1
+                self._irq = False
+        elif self.state == 1:  # LOAD
+            self.count = self.preset
+            self.state = 2
+        elif self.state == 2:  # CNT
+            if self.ctrl & 1:
+                if self.count > 1:
+                    self.count -= 1
+                else:
+                    self.count = 0
+                    self.state = 3
+                    self._irq = True
+            else:
+                self.state = 0
+        else:  # INT
+            if ((self.ctrl >> 1) & 3) == 0:
+                self.ctrl &= ~1
+            else:
+                self._irq = False
+            self.state = 0
+
+    @property
+    def irq(self):
+        return bool((self.ctrl & 8) and self._irq)
+
 class RegisterFile:
     def __init__(self, cpu):
         self.cpu = cpu
@@ -65,8 +132,23 @@ class Memory:
     def __init__(self, cpu):
         self.cpu = cpu
         self.data: Dict[int, Word] = {}
+        self.timers = {
+            "Timer 0": Timer(cpu, 0x7F00),
+            "Timer 1": Timer(cpu, 0x7F10)
+        }
+
+    def _get_timer_for_addr(self, addr: int) -> Optional[Timer]:
+        if 0x7F00 <= addr <= 0x7F0B:
+            return self.timers["Timer 0"]
+        elif 0x7F10 <= addr <= 0x7F1B:
+            return self.timers["Timer 1"]
+        return None
 
     def read(self, addr: int) -> Word:
+        timer = self._get_timer_for_addr(addr)
+        if timer:
+            return Word(timer.read(addr))
+
         val = self.data.get(int(addr), 0)
 
         # Check if address is in text segment (code)
@@ -93,6 +175,15 @@ class Memory:
     def write(self, addr: int, change, pc: int):
         data = change.new
         iaddr = int(addr)
+
+        timer = self._get_timer_for_addr(iaddr)
+        if timer:
+            timer.write(iaddr, data.value)
+            self.cpu.log_behavior(MemWriteBehavior(
+                self.cpu.cycle, pc, iaddr, data.value,
+                origin=change.origin.value, reason=change.reason
+            ))
+            return
 
         if self.is_text_segment(iaddr):
             self.cpu.log_behavior(MemWriteBehavior(
@@ -152,11 +243,16 @@ class CPU:
         curpc = self.pc
         self.current_behaviors = []
         self.shadows = self.slots.copy()
+            
         self._stage_wb()
         self._stage_mem()
         self._stage_ex()
         self._stage_id()
         self._stage_if()
+        
+        for timer in self.dmem.timers.values():
+            timer.step()
+            
         self.capture_snapshot(curpc)
 
     def _stage_wb(self):
@@ -281,11 +377,20 @@ class CPU:
                 pipeline_snap[s.name] = None
             s = PIPELINE[s]
 
+        timers_snap = {}
+        for name, timer in self.dmem.timers.items():
+            timers_snap[name] = {
+                "ctrl": hex32(timer.ctrl),
+                "preset": hex32(timer.preset),
+                "count": hex32(timer.count)
+            }
+
         self.history.append({
             "cycle": self.cycle,
             "pc": hex32(cur_pc),
             "gpr": [hex32(r.value) for r in self.regs],
             "memory": {hex32(addr): hex32(val.value) for addr, val in self.dmem.copy().items()},
+            "timers": timers_snap,
             "pipeline": pipeline_snap,
             "behaviors": self.current_behaviors.copy(),
         })

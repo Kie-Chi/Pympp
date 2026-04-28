@@ -10,7 +10,7 @@ from ..log import get_logger
 from .schema import (
     LoadResponse, ResetResponse, CycleInfo, MemoryPageResponse,
     SnapshotSchema, PipelineStageSchema, RegisterSchema,
-    EventsSchema, ForwardingSchema, ChangeSchema
+    EventsSchema, ForwardingSchema, ChangeSchema, TimerSchema
 )
 from .quiz import router as quiz_router
 from .exercise import router as exercise_router
@@ -269,6 +269,16 @@ def _to_snapshot_schema(snap: Dict[str, Any], outofbound: bool = False) -> Snaps
         register_changes=register_changes,
         memory_changes=memory_changes
     )
+    
+    timers_data = None
+    if "timers" in snap:
+        timers_data = {
+            name: TimerSchema(
+                ctrl=timer["ctrl"],
+                preset=timer["preset"],
+                count=timer["count"]
+            ) for name, timer in snap["timers"].items()
+        }
 
     return SnapshotSchema(
         outofbound=outofbound,
@@ -277,6 +287,7 @@ def _to_snapshot_schema(snap: Dict[str, Any], outofbound: bool = False) -> Snaps
         pipeline=pipeline_data,
         registers=registers_data,
         memory=memory_data,
+        timers=timers_data,
         events=events_data
     )
 
