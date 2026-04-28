@@ -53,13 +53,6 @@ export const demoConfig: AppConfig = {
   debug: { showPCInput: true, enableManualPC: true, enableCycleSlider: true },
 };
 
-const defaultFeatureConfig: FeatureConfig = {
-  showQuiz: true,
-  showExercise: true,
-  showExercisePart1: true,
-  showExercisePart2: true,
-};
-
 // Global state
 type ConfigChangeListener = (config: GlobalConfig) => void;
 

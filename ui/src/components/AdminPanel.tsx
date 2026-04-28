@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Users, Trophy, BarChart3, RefreshCw, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Users, BarChart3, RefreshCw, Maximize2, Minimize2 } from 'lucide-react';
 import {
   getQuizAdminSessions, getQuizAdminStats, getQuizAdminRecords,
   getExerciseAdminSessions, getExerciseAdminStats, getExerciseAdminRecords

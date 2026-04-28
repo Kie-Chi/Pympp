@@ -147,16 +147,16 @@ const ExerciseMode: React.FC<Props> = ({ isOpen, onClose, onLoadAsm, showPart1 =
               endExerciseSession(state.exerciseSessionId).catch(err => console.error(err));
             }
             localStorage.removeItem(STORAGE_KEY_AT);
-            loadInstructions(false, part);
+            loadInstructions(false);
           } else {
             setSavedState(state);
             setShowContinuePrompt(true);
           }
         } catch {
-          loadInstructions(false, part);
+          loadInstructions(false);
         }
       } else {
-        loadInstructions(false, part);
+        loadInstructions(false);
       }
     } else {
       // Matrix mode (combined RS + RT)
@@ -184,7 +184,7 @@ const ExerciseMode: React.FC<Props> = ({ isOpen, onClose, onLoadAsm, showPart1 =
     }
   };
 
-  const loadInstructions = async (restoreState: boolean = false, part: ExercisePart = 'AT') => {
+  const loadInstructions = async (restoreState: boolean = false) => {
     setLoading(true);
     setShowContinuePrompt(false);
 
@@ -207,7 +207,7 @@ const ExerciseMode: React.FC<Props> = ({ isOpen, onClose, onLoadAsm, showPart1 =
         console.error('Failed to end previous exercise session:', err);
       });
       // Clear saved state since we're starting fresh
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY_AT);
     }
 
     try {
@@ -569,7 +569,7 @@ const ExerciseMode: React.FC<Props> = ({ isOpen, onClose, onLoadAsm, showPart1 =
     if (allFilledAndCorrect) {
       setShowResult(true);
       // Clear saved state when all correct
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY_AT);
     }
 
     // Record all answers to backend (each submit is a record)
@@ -769,13 +769,13 @@ const ExerciseMode: React.FC<Props> = ({ isOpen, onClose, onLoadAsm, showPart1 =
               </div>
               <div className="flex gap-4 justify-center">
                 <button
-                  onClick={() => loadInstructions(true, 'AT')}
+                  onClick={() => loadInstructions(true)}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Continue Previous Session
                 </button>
                 <button
-                  onClick={() => loadInstructions(false, 'AT')}
+                  onClick={() => loadInstructions(false)}
                   className="px-6 py-2 bg-gray-200 text-slate-700 rounded-lg hover:bg-gray-300 transition-colors"
                 >
                   Start New Session
@@ -798,7 +798,7 @@ const ExerciseMode: React.FC<Props> = ({ isOpen, onClose, onLoadAsm, showPart1 =
                   </p>
                 </div>
                 <button
-                  onClick={() => loadInstructions(false, 'AT')}
+                  onClick={() => loadInstructions(false)}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
                 >
                   Practice Again
