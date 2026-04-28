@@ -372,6 +372,86 @@ class Blez(Instruction):
         if rs_val.value == 0 or (rs_val.value & 0x80000000):  # <= 0
             packet.npc = packet.pc + 4 + (self.imm16_signed << 2)
 
+@instr(
+    opcode=0,
+    funct=0b101010,
+    tuse_rs=Stage.EX,
+    tuse_rt=Stage.EX,
+    tnew=Stage.MEM,
+    asm_type='R',
+    asm_template='$rd, $rs, $rt',
+    asm_encoding='000000 sssss ttttt ddddd 00000 101010'
+)
+class Slt(Instruction):
+    def get_wreg(self) -> Optional[int]:
+        return self.rd
+
+    def disassemble(self, pc: int = None) -> str:
+        return f"slt ${self.rd}, ${self.rs}, ${self.rt}"
+
+    def render_str(self, pc: int = None):
+        return f"slt ${self.rd}|w, ${self.rs}|r, ${self.rt}|r"
+
+    def execute(self, packet: Packet):
+        if packet.stage != Stage.EX:
+            return
+        rs_val = packet.pool.read_reg(self.rs, packet.stage)
+        rt_val = packet.pool.read_reg(self.rt, packet.stage)
+        result = 1 if rs_val.signed < rt_val.signed else 0
+        packet.pool.write_reg(packet, self.rd, to_word(result), "slt")
+
+@instr(
+    opcode=0b000111,
+    tuse_rs=Stage.ID,
+    asm_type='B',
+    asm_template='$rs, label',
+    asm_encoding='000111 sssss 00000 iiiiiiiiiiiiiiii',
+    asm_mnemonic='bgtz'
+)
+class Bgtz(Instruction):
+    def get_wreg(self) -> Optional[int]:
+        return None
+
+    def disassemble(self, pc: int = None) -> str:
+        return f"bgtz ${self.rs}, {self.imm16_signed}"
+
+    def render_str(self, pc: int = None):
+        return f"bgtz ${self.rs}|r, {self.imm16_signed}"
+
+    def execute(self, packet: Packet):
+        if packet.stage != Stage.ID:
+            return
+        rs_val = packet.pool.read_reg(self.rs, packet.stage)
+        if rs_val.signed > 0:
+            packet.npc = packet.pc + 4 + (self.imm16_signed << 2)
+
+@instr(
+    opcode=0b000101,
+    tuse_rs=Stage.ID,
+    tuse_rt=Stage.ID,
+    asm_type='B',
+    asm_template='$rs, $rt, label',
+    asm_encoding='000101 sssss ttttt iiiiiiiiiiiiiiii',
+    asm_mnemonic='bne'
+)
+class Bne(Instruction):
+    def get_wreg(self) -> Optional[int]:
+        return None
+
+    def disassemble(self, pc: int = None) -> str:
+        return f"bne ${self.rs}, ${self.rt}, {self.imm16_signed}"
+
+    def render_str(self, pc: int = None):
+        return f"bne ${self.rs}|r, ${self.rt}|r, {self.imm16_signed}"
+
+    def execute(self, packet: Packet):
+        if packet.stage != Stage.ID:
+            return
+        rs_val = packet.pool.read_reg(self.rs, packet.stage)
+        rt_val = packet.pool.read_reg(self.rt, packet.stage)
+        if rs_val != rt_val:
+            packet.npc = packet.pc + 4 + (self.imm16_signed << 2)
+
 # Nop is an alias for sll $0, $0, 0
 class Nop(Sll):
     """Nop is just an alias for sll $0, $0, 0"""
