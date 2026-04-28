@@ -471,7 +471,7 @@ const QuizMode: React.FC<Props> = ({ isOpen, onClose }) => {
                 <p className="text-slate-600 mt-2">You scored <span className="font-bold text-purple-600 text-xl">{score}</span> / {instructions.length}</p>
               </div>
               <button 
-                onClick={loadInstructions}
+                onClick={() => loadInstructions(false)}
                 className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 mx-auto"
               >
                 <RefreshCw size={18} /> Play Again
